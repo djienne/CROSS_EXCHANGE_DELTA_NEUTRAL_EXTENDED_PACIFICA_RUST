@@ -57,6 +57,10 @@ COPY --from=builder /app/target/release/extended_connector /app/extended_connect
 # Copy Python signing script
 COPY --from=builder /app/scripts /app/scripts
 
+# Copy entrypoint script
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
+
 # Copy configuration template (will be overridden by volume mount)
 COPY config.json /app/config.json
 
@@ -72,4 +76,4 @@ HEALTHCHECK --interval=5m --timeout=10s --start-period=30s --retries=3 \
     CMD pgrep -f extended_connector || exit 1
 
 # Run the bot
-CMD ["/app/extended_connector"]
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
