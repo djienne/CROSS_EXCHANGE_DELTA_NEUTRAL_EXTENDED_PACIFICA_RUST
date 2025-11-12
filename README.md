@@ -28,7 +28,15 @@ The main feature is a **fully automated funding rate arbitrage bot** that:
 
 ## Quick Start: Running the Bot
 
-### 1. Setup Credentials
+### 1. Install Python Dependencies
+
+The bot uses Python scripts for Starknet order signing (SNIP-12). Install the required packages:
+
+```bash
+pip install -r requirements.txt
+```
+
+### 2. Setup Credentials
 
 Create `.env` file:
 ```bash
@@ -44,7 +52,7 @@ API_PUBLIC=your_pacifica_public_key
 API_PRIVATE=your_pacifica_private_key
 ```
 
-### 2. Configure Filters
+### 3. Configure Filters
 
 Edit `config.json`:
 ```json
@@ -58,7 +66,7 @@ Edit `config.json`:
 }
 ```
 
-### 3. Run the Bot
+### 4. Run the Bot
 
 ```bash
 cargo run
