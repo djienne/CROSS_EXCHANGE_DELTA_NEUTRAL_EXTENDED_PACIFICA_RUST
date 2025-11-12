@@ -16,6 +16,13 @@ echo ""
 echo "Testing Python signing script:"
 ls -la /app/scripts/sign_order.py
 echo ""
+echo "Ensuring bot_state.json exists and is writable..."
+if [ ! -e "/app/bot_state.json" ]; then
+  echo "bot_state.json not found; creating empty state file at /app/bot_state.json"
+  echo '{"current_position":null,"last_rotation_time":null,"total_rotations":0}' > /app/bot_state.json || true
+fi
+chmod 664 /app/bot_state.json 2>/dev/null || true
+
 echo "=== Starting extended_connector ==="
 set +e
 /app/extended_connector 2>&1

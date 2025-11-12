@@ -31,7 +31,7 @@ docker-compose up -d
 The bot will:
 - Load credentials from `.env`
 - Mount `config.json` for filtering parameters
-- Persist state to `bot_state.json`
+- Persist state to `bot_state.json` (host-mounted, no rebuild needed)
 - Run in detached mode with auto-restart
 
 ### 3. View Logs
@@ -85,7 +85,8 @@ The container mounts two files from your host:
   - Filter parameters (min volume, spreads, APR)
 - `./bot_state.json` → `/app/bot_state.json` (read-write)
   - Current position and rotation state
-  - Persists across container restarts
+  - Always bind-mounted from the host, so updates are visible immediately without `docker compose build`
+  - If the file does not exist on first run, the container will create an empty state file
 
 ### Resource Limits
 

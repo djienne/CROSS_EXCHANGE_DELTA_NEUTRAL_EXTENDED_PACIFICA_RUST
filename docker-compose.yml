@@ -28,6 +28,9 @@ services:
       # Mount state file for persistence (read-write)
       - ./bot_state.json:/app/bot_state.json:rw
 
+      # Ensure state file is always external: container never relies on baked-in copies
+      # Edits to bot_state.json on the host are reflected immediately; no rebuild required
+
       # Alternative: use named volume for state persistence
       # - bot-data:/app/data
 

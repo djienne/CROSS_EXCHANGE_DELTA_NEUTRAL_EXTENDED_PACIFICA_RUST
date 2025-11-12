@@ -120,7 +120,8 @@ impl PacificaWsTrading {
 
         // Serialize and send request
         let request_json = serde_json::to_string(&cancel_request)?;
-        debug!("[PACIFICA_WS] Sending request: {}", request_json);
+        // Avoid logging the full serialized request (contains signature and keys)
+        debug!("[PACIFICA_WS] Sending cancel_all_orders request (all_symbols: {}, symbol: {:?})", all_symbols, symbol);
         write.send(Message::Text(request_json)).await?;
 
         // Wait for response with matching ID

@@ -77,6 +77,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         vault_id,
     )?;
 
+    // Reconcile saved state with live positions before entering the main loop
+    if let Err(e) = bot.reconcile_state().await {
+        eprintln!("⚠️  Warning: failed to reconcile state at startup: {}", e);
+    }
+
     println!("✅ Bot initialized successfully");
     println!("⚡ Starting main bot loop...");
     println!();
