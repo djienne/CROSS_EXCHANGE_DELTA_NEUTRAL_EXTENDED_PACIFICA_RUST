@@ -48,10 +48,10 @@ Different exchanges often have different funding rates for the same asset. This 
 Regardless of whether ETH goes up or down, your positions offset each other while you collect the funding spread.
 
 ### Why It Works
-✅ **Market inefficiency** - Different exchanges have different trader ratios and market dynamics
-✅ **No directional risk** - You're hedged against price movements
-✅ **Predictable income** - Funding rates are published in advance
-✅ **Scalable** - Works with any position size (subject to liquidity)
+* ✅ **Market inefficiency** - Different exchanges have different trader ratios and market dynamics
+* ✅ **No directional risk** - You're hedged against price movements
+* ✅ **Predictable income** - Funding rates are published in advance
+* ✅ **Scalable** - Works with any position size (subject to liquidity)
 
 ### This Bot's Strategy
 This bot uses a **48-hour rotation cycle** with multiple objectives:
