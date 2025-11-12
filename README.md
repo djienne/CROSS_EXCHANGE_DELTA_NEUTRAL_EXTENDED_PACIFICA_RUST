@@ -21,6 +21,62 @@
 
 ---
 
+## 📚 What is Delta Neutral Funding Rate Farming?
+
+**Delta neutral funding rate farming** is a crypto trading strategy that earns passive income from funding rate differentials across exchanges while remaining market neutral.
+
+### The Concept
+
+Perpetual futures contracts use **funding rates** to keep their prices anchored to spot prices. Every 8 hours, depending on market sentiment:
+- When longs outnumber shorts → longs **pay** shorts (negative funding)
+- When shorts outnumber longs → shorts **pay** longs (positive funding)
+
+Different exchanges often have different funding rates for the same asset. This creates an arbitrage opportunity.
+
+### How It Works
+1. **Identify the spread** - Find two exchanges where one pays significantly more than the other
+2. **Open opposite positions** - Go LONG on the exchange with positive funding, SHORT on the exchange with negative funding
+3. **Stay market neutral** - Because you're both long and short on the same asset, price movements cancel out
+4. **Collect the difference** - Every 8 hours, you receive funding on one side and pay on the other, pocketing the spread
+
+### Simple Example
+**Scenario**: ETH funding rates differ across exchanges
+- **Exchange A**: +0.05% funding rate (you go LONG and receive payment)
+- **Exchange B**: -0.02% funding rate (you go SHORT and pay)
+- **Your net profit**: 0.03% every 8 hours = 0.09% daily = **~32% APR**
+
+Regardless of whether ETH goes up or down, your positions offset each other while you collect the funding spread.
+
+### Why It Works
+✅ **Market inefficiency** - Different exchanges have different trader ratios and market dynamics
+✅ **No directional risk** - You're hedged against price movements
+✅ **Predictable income** - Funding rates are published in advance
+✅ **Scalable** - Works with any position size (subject to liquidity)
+
+### Important Risks
+⚠️ **Funding rate reversals** - Rates can change and turn against you
+⚠️ **Execution risk** - Opening/closing positions at different prices creates P&L impact
+⚠️ **Spread risk** - Wide bid-ask spreads eat into profits
+⚠️ **Exchange risk** - Counterparty risk if an exchange fails or halts withdrawals
+⚠️ **Liquidation risk** - Extreme price movements could liquidate one leg before you can react
+⚠️ **Capital inefficiency** - Requires collateral on both exchanges
+
+### This Bot's Strategy
+This bot uses a **48-hour rotation cycle** with multiple objectives:
+
+1. **Generate trading volume** - Regular position rotation creates volume across different assets, which can qualify for potential exchange airdrops and rewards programs
+2. **Diversify exposure** - Rotating through different assets (BTC, ETH, SOL, etc.) reduces concentration risk
+3. **Capture funding spreads** - Earn funding rate differentials as a bonus while maintaining positions
+4. **Stay market neutral** - All positions are delta neutral, minimizing directional price risk
+
+The 48-hour cycle is intentionally short - not to maximize funding returns (which would require longer holding periods), but to generate consistent volume across multiple markets while staying hedged. This approach is ideal for:
+- Farming potential airdrops through volume and activity
+- Maintaining diversified positions across assets
+- Earning funding spreads as a secondary benefit
+- Minimizing risk exposure through constant rebalancing
+
+---
+
 ## Prerequisites
 
 Before installation, ensure you have:
