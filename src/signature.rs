@@ -153,8 +153,8 @@ pub fn calculate_signed_amounts(
             (base_amount_scaled.ceil() as i128, quote_amount_scaled.ceil() as i128)
         }
         OrderSide::Sell => {
-            // SELL: Round DOWN both base and quote
-            (base_amount_scaled.floor() as i128, quote_amount_scaled.floor() as i128)
+            // SELL: Round DOWN base, Round UP quote (to match Extended's calculation)
+            (base_amount_scaled.floor() as i128, quote_amount_scaled.ceil() as i128)
         }
     };
 

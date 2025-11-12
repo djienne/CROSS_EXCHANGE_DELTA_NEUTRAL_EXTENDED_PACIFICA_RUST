@@ -617,7 +617,7 @@ impl PacificaTrading {
             "amount": rounded_size.to_string(),
             "side": side.as_str(),
             "slippage_percent": slippage_percent.to_string(),
-            "reduce_only": false,
+            "reduce_only": reduce_only,
             "client_order_id": client_order_id,
             "agent_wallet": self.credentials.agent_wallet
         });
