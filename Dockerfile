@@ -1,79 +1,84 @@
-# Multi-stage build for Rust trading bot
-# Stage 1: Build the application
-FROM rust:1.91-slim as builder
+# Multi-stage build for Extended DEX and Pacifica Funding Rate Bot
+# Stage 1: Builder
+FROM rust:1.91-bookworm AS builder
 
-WORKDIR /app
-
-# Install build dependencies
+# Install build dependencies (following best practices)
 RUN apt-get update && apt-get install -y \
+    build-essential \
     pkg-config \
     libssl-dev \
+    python3 \
+    python3-pip \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy dependency manifests
+# Create app directory
+WORKDIR /app
+
+# Copy Python requirements first (for order signing)
+COPY requirements.txt ./
+RUN pip3 install -r requirements.txt --break-system-packages
+
+# Copy and install python_sdk-starknet (Extended DEX SDK)
+COPY python_sdk-starknet ./python_sdk-starknet
+RUN cd python_sdk-starknet && pip3 install -e . --break-system-packages && cd ..
+
+# Copy Cargo files for dependency caching
 COPY Cargo.toml Cargo.lock ./
 
-# Create a dummy main.rs to build dependencies (cache layer)
-RUN mkdir -p src && \
-    echo "fn main() {}" > src/main.rs && \
-    echo "pub fn lib() {}" > src/lib.rs
-
-# Build dependencies (this layer will be cached)
-RUN cargo build --release || true
-
-# Remove dummy files
-RUN rm -rf src
-
-# Copy actual source code
+# Copy source code
 COPY src ./src
 COPY examples ./examples
+
+# Copy Python signing script
 COPY scripts ./scripts
 
-# Build the actual application
+# Build release binary
 RUN cargo build --release
 
-# Stage 2: Runtime image
+# Stage 2: Runtime
 FROM debian:bookworm-slim
-
-WORKDIR /app
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
     ca-certificates \
-    libssl3 \
     python3 \
     python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies for order signing
-RUN pip3 install --no-cache-dir \
-    starknet-py==0.20.0 \
-    cairo-lang==0.13.1 \
-    --break-system-packages
+# Copy Python requirements and install
+COPY requirements.txt ./
+RUN pip3 install -r requirements.txt --break-system-packages --no-cache-dir
 
-# Copy compiled binary from builder
+# Copy and install python_sdk-starknet
+COPY python_sdk-starknet ./python_sdk-starknet
+RUN cd python_sdk-starknet && pip3 install -e . --break-system-packages --no-cache-dir && cd ..
+
+# Create app user for security
+RUN useradd -m -u 1000 botuser
+
+# Create app directory
+WORKDIR /app
+
+# Copy binary from builder
 COPY --from=builder /app/target/release/extended_connector /app/extended_connector
 
 # Copy Python signing script
 COPY --from=builder /app/scripts /app/scripts
 
-# Copy entrypoint script
-COPY docker-entrypoint.sh /app/docker-entrypoint.sh
-RUN chmod +x /app/docker-entrypoint.sh
+# Create data directory with proper permissions
+RUN mkdir -p /app/data && chown -R botuser:botuser /app
 
-# Copy configuration template (will be overridden by volume mount)
-COPY config.json /app/config.json
-
-# Create directory for state persistence
-RUN mkdir -p /app/data
+# Switch to non-root user
+USER botuser
 
 # Set environment variables
 ENV RUST_LOG=info
 ENV RUST_BACKTRACE=1
 
 # Health check (checks if process is running)
-HEALTHCHECK --interval=5m --timeout=10s --start-period=30s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD pgrep -f extended_connector || exit 1
 
 # Run the bot
-ENTRYPOINT ["/app/docker-entrypoint.sh"]
+CMD ["/app/extended_connector"]
