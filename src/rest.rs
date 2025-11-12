@@ -616,6 +616,7 @@ impl RestClient {
         stark_public_key: &str,
         vault_id: &str,
         reduce_only: bool,
+        max_base_size: Option<f64>,
     ) -> Result<OrderResponse> {
         info!(
             "Placing market {} order on {} for ${:.2}",
@@ -658,8 +659,12 @@ impl RestClient {
         // This ensures our signed amounts match what the server recalculates
         let price = (raw_price * price_multiplier).round() / price_multiplier;
 
-        // 4. Calculate quantity from notional and round to correct precision
-        let raw_quantity = notional_usd / price;
+        // 4. Calculate quantity from notional
+        //    If reduce_only and a max_base_size is provided, clamp to that size to avoid oversizing
+        let mut raw_quantity = notional_usd / price;
+        if let Some(max_base) = max_base_size {
+            raw_quantity = raw_quantity.min(max_base);
+        }
 
         // Get trading config constraints
         let min_size: f64 = market_config.trading_config.min_order_size.parse()
@@ -667,11 +672,19 @@ impl RestClient {
         let size_increment: f64 = market_config.trading_config.min_order_size_change.parse()
             .map_err(|e| ConnectorError::Other(format!("Failed to parse minOrderSizeChange: {}", e)))?;
 
-        // Round quantity to the nearest increment
-        let quantity = (raw_quantity / size_increment).round() * size_increment;
+        // Round quantity according to context:
+        // - Normal orders: nearest increment
+        // - Reduce-only: round DOWN to avoid exceeding current position size
+        let mut quantity = if reduce_only {
+            (raw_quantity / size_increment).floor() * size_increment
+        } else {
+            (raw_quantity / size_increment).round() * size_increment
+        };
 
-        // Ensure meets minimum
-        let quantity = quantity.max(min_size);
+        // For normal orders, enforce exchange minimum. For reduce-only, avoid bumping up which can exceed size.
+        if !reduce_only {
+            quantity = quantity.max(min_size);
+        }
 
         // Calculate formatting precisions
         let qty_precision = if size_increment >= 1.0 {
@@ -874,6 +887,7 @@ impl RestClient {
             stark_public_key,
             vault_id,
             true, // reduce_only = true
+            Some(position.size_f64()),
         )
         .await
     }

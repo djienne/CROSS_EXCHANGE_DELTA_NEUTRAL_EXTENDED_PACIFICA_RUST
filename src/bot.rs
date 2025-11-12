@@ -381,7 +381,7 @@ impl FundingBot {
 
     /// Close the current position
     pub async fn close_current_position(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        if let Some(pos) = &self.state.current_position {
+        if self.state.current_position.is_some() {
             // Ensure state matches live positions before attempting close
             self.reconcile_state().await.ok();
 
