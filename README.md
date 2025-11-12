@@ -1,6 +1,8 @@
 # Extended DEX Connector & Funding Rate Arbitrage Bot
 
-**A production-ready autonomous trading bot for delta neutral funding rate arbitrage between Extended DEX (Starknet) and Pacifica, plus a comprehensive Rust connector library for both exchanges.**
+**An autonomous trading bot for delta neutral funding rate arbitrage between Extended DEX (Starknet) and Pacifica, plus a comprehensive Rust connector library for both exchanges.**
+
+**New to Extended DEX?** [Sign up with my referral link](https://app.extended.exchange/join/FREQTRADE) and receive a **10% discount on commissions** for your first $50M in total trading volume.
 
 ## 🤖 Autonomous Trading Bot
 
