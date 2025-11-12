@@ -64,6 +64,8 @@ The 48-hour cycle is intentionally short - not to maximize funding returns (whic
 - Farming potential airdrops through volume, position holding time and activity
 - Earning funding spreads as a secondary benefit
 
+  The bot will scan all pairs available on both Pacifica and Extended. It will filter out low volume and high spread pairs.
+
 ---
 
 ## Prerequisites
@@ -583,14 +585,6 @@ cargo run --bin emergency_exit
 ```
 
 **Testing Emergency Exit**: You can test the emergency exit tool by running it when you have an active position. It will close both positions and provide detailed status. For safety, always test with small positions first.
-
-## Supported Markets
-
-Common trading pairs:
-- BTC-USD / BTC
-- ETH-USD / ETH
-- SOL-USD / SOL
-- And 20+ more pairs available on both exchanges
 
 ## Dependencies
 
