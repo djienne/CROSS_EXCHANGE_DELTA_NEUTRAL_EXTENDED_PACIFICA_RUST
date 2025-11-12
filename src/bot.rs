@@ -5,6 +5,7 @@ use crate::{
     OpportunityConfig,
 };
 use crate::pacifica::types::PacificaPosition;
+use crate::pacifica::PacificaWsTrading;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
@@ -91,6 +92,7 @@ impl BotState {
 pub struct FundingBot {
     extended_client: RestClient,
     pacifica_client: PacificaTrading,
+    pacifica_creds: PacificaCredentials,
     opportunity_finder: OpportunityFinder,
     config: OpportunityConfig,
     state: BotState,
@@ -112,7 +114,7 @@ impl FundingBot {
         let pacifica_client = PacificaTrading::new(pacifica_creds.clone());
         let opportunity_finder = OpportunityFinder::new(
             extended_api_key.clone(),
-            pacifica_creds,
+            pacifica_creds.clone(),
             config.clone(),
         )?;
 
@@ -121,6 +123,7 @@ impl FundingBot {
         Ok(Self {
             extended_client,
             pacifica_client,
+            pacifica_creds,
             opportunity_finder,
             config,
             state,
@@ -299,23 +302,13 @@ impl FundingBot {
         let extended_balance = self.extended_client.get_balance().await?;
         let extended_free = extended_balance.available_for_trade.parse::<f64>()?;
 
-        // For Pacifica, we need to check positions and calculate available capital
-        let pacifica_positions = self.pacifica_client.get_positions().await?;
-        let _total_margin: f64 = pacifica_positions.iter()
-            .map(|p| p.margin.parse::<f64>().unwrap_or(0.0))
-            .sum();
-
-        // TODO: Pacifica API doesn't currently expose a direct account balance endpoint
-        // As a workaround, we assume similar capital on both exchanges
-        // LIMITATION: This may cause position sizing errors if balances differ significantly
-        // RECOMMENDED: Manually ensure both exchanges have similar free collateral
-        // FUTURE: Implement proper Pacifica balance fetching when API endpoint becomes available
-        let pacifica_free = extended_free; // Temporary: Assume similar capital
-
-        warn!("⚠️  Note: Pacifica balance is estimated (assumes same as Extended: ${:.2}). Ensure both exchanges have similar collateral.", pacifica_free);
+        // Fetch Pacifica account balance via WebSocket
+        let pacifica_ws = PacificaWsTrading::new(self.pacifica_creds.clone(), false); // false = mainnet
+        let pacifica_account_info = pacifica_ws.get_account_info().await?;
+        let pacifica_free = pacifica_account_info.available_to_spend_f64();
 
         info!("{} {}", "💰 Extended free collateral:", format!("${:.2}", extended_free));
-        info!("{} {}", "💰 Pacifica estimated free:", format!("${:.2}", pacifica_free));
+        info!("{} {}", "💰 Pacifica free collateral:", format!("${:.2}", pacifica_free));
 
         // Get lot sizes
         let extended_market_config = self.extended_client.get_market_config(&extended_market).await?;
