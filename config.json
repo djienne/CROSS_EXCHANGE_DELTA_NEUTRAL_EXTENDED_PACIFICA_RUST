@@ -6,7 +6,8 @@
     "min_net_apr_pct": 5.0
   },
   "trading": {
-    "max_position_size_usd": 1000.0
+    "max_position_size_usd": 1000.0,
+    "hold_time_hours": 48
   },
   "display": {
     "max_opportunities_shown": 10,
@@ -23,8 +24,9 @@
     "max_cross_exchange_spread_pct": "Maximum mid-price difference % between exchanges",
     "min_net_apr_pct": "Minimum net APR % (funding rate arbitrage profit after spreads)",
     "max_position_size_usd": "Maximum notional USD value per position (applied per exchange, limited by available capital)",
+    "hold_time_hours": "Time in hours to hold a position before considering rotation (default: 48)",
     "fetch_timeout_seconds": "HTTP request timeout for API calls",
     "rate_limit_delay_ms": "Delay between sequential requests to avoid rate limiting",
-    "bot_behavior": "Bot monitors every 15 minutes, holds positions for 48 hours before rotation, uses 95% of minimum available capital (capped by max_position_size_usd), uses market orders with 5 retry attempts"
+    "bot_behavior": "Bot monitors every 15 minutes, holds positions for configured hold_time_hours before rotation, uses 95% of minimum available capital (capped by max_position_size_usd), uses market orders with 5 retry attempts"
   }
 }

@@ -16,7 +16,6 @@ use tracing::{info, warn, error};
 
 const STATE_FILE: &str = "bot_state.json";
 const MONITORING_INTERVAL_MINUTES: u64 = 15;
-const POSITION_HOLD_TIME_HOURS: u64 = 48;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BotState {
@@ -59,29 +58,29 @@ impl BotState {
         Ok(())
     }
 
-    /// Check if current position should be rotated (after 48 hours)
-    pub fn should_rotate(&self) -> bool {
+    /// Check if current position should be rotated based on configured hold time
+    pub fn should_rotate(&self, hold_time_hours: u64) -> bool {
         if let Some(pos) = &self.current_position {
             let now = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
                 .as_secs();
             let elapsed_hours = (now - pos.opened_at) / 3600;
-            elapsed_hours >= POSITION_HOLD_TIME_HOURS
+            elapsed_hours >= hold_time_hours
         } else {
             false
         }
     }
 
     /// Get time remaining until rotation (in hours)
-    pub fn hours_until_rotation(&self) -> Option<f64> {
+    pub fn hours_until_rotation(&self, hold_time_hours: u64) -> Option<f64> {
         if let Some(pos) = &self.current_position {
             let now = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
                 .as_secs();
             let elapsed_hours = (now - pos.opened_at) as f64 / 3600.0;
-            let remaining = POSITION_HOLD_TIME_HOURS as f64 - elapsed_hours;
+            let remaining = hold_time_hours as f64 - elapsed_hours;
             Some(remaining.max(0.0))
         } else {
             None
@@ -196,7 +195,8 @@ impl FundingBot {
         info!("╠═══════════════════════════════════════════════════════════════╣");
 
         if let Some(pos) = &self.state.current_position {
-            let hours_remaining = self.state.hours_until_rotation().unwrap_or(0.0);
+            let hold_time_hours = self.config.trading.hold_time_hours;
+            let hours_remaining = self.state.hours_until_rotation(hold_time_hours).unwrap_or(0.0);
 
             // Convert opened_at timestamp to datetime
             let opened_datetime = chrono::DateTime::from_timestamp(pos.opened_at as i64, 0)
@@ -204,7 +204,7 @@ impl FundingBot {
                 .unwrap_or_else(|| "Unknown".to_string());
 
             // Calculate rotation time
-            let rotation_timestamp = pos.opened_at + (POSITION_HOLD_TIME_HOURS * 3600);
+            let rotation_timestamp = pos.opened_at + (hold_time_hours * 3600);
             let rotation_datetime = chrono::DateTime::from_timestamp(rotation_timestamp as i64, 0)
                 .map(|dt| dt.format("%Y-%m-%d %H:%M:%S UTC").to_string())
                 .unwrap_or_else(|| "Unknown".to_string());
@@ -424,7 +424,7 @@ impl FundingBot {
             "minutes");
         info!("{} {} {}",
             "⏱️  Position hold time:",
-            POSITION_HOLD_TIME_HOURS,
+            self.config.trading.hold_time_hours,
             "hours");
         info!("{}", "🛑 Press Ctrl+C to stop gracefully");
 
@@ -456,10 +456,10 @@ impl FundingBot {
             info!("");
 
             // Check if we need to rotate
-            if self.state.should_rotate() {
+            if self.state.should_rotate(self.config.trading.hold_time_hours) {
                 info!("{} {} {}",
                     "⏰ Position has been open for",
-                    POSITION_HOLD_TIME_HOURS,
+                    self.config.trading.hold_time_hours,
                     "hours, rotating...");
 
                 // Close current position
@@ -488,7 +488,7 @@ impl FundingBot {
                 }
             } else {
                 // Position active, just monitoring
-                if let Some(hours) = self.state.hours_until_rotation() {
+                if let Some(hours) = self.state.hours_until_rotation(self.config.trading.hold_time_hours) {
                     info!("{} {} {}",
                         "⏳ Position active,",
                         format!("{:.1}", hours),
