@@ -4,6 +4,19 @@
 
 ---
 
+## 🎁 Get Exclusive Referral Benefits
+
+**Extended DEX** - [Sign up here](https://app.extended.exchange/join/FREQTRADE)
+- 10% commission discount on first $50M volume
+
+**Pacifica** - [Sign up here](https://app.pacifica.fi/) with referral codes:
+```
+411J9J7CYNFZN3SX  2K7D40A9H53M2TJT  S1G3A2063Q7410BV
+5KH0XDRD8BDGTBCT  S1YHDS2GWAJTWJ4M  7KB69JEC3BSA6GTR
+```
+
+---
+
 ## Prerequisites
 
 Before installation, ensure you have:
@@ -11,12 +24,8 @@ Before installation, ensure you have:
 - **Rust 1.70+** - [Install Rust](https://rustup.rs/)
 - **Python 3.8+** - Required for order signing
 - **pip** - Python package manager
-- **Extended DEX Account** - [Sign up here](https://app.extended.exchange/join/FREQTRADE) (10% commission discount on first $50M volume)
-- **Pacifica Account** - [Sign up here](https://app.pacifica.fi/) with referral codes:
-  ```
-  411J9J7CYNFZN3SX  2K7D40A9H53M2TJT  S1G3A2063Q7410BV
-  5KH0XDRD8BDGTBCT  S1YHDS2GWAJTWJ4M  7KB69JEC3BSA6GTR
-  ```
+- **Extended DEX Account** - Create using referral link above
+- **Pacifica Account** - Create using referral codes above
 - **Funded Accounts** - Collateral on both exchanges (USDC recommended)
 - **API Keys** - Generated from both exchange dashboards
 
