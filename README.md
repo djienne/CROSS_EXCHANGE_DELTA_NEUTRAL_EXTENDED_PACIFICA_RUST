@@ -2,17 +2,45 @@
 
 **An autonomous trading bot for delta neutral funding rate arbitrage between Extended DEX (Starknet) and Pacifica, plus a comprehensive Rust connector library for both exchanges.**
 
-**New to Extended DEX?** [Sign up with my referral link](https://app.extended.exchange/join/FREQTRADE) and receive a **10% discount on commissions** for your first $50M in total trading volume.
+---
 
-**Pacifica**: Sign up at [app.pacifica.fi](https://app.pacifica.fi/) and use one of the following referral codes when registering (if one is already taken, try another):
+## ⚠️ IMPORTANT SECURITY & RISK WARNINGS
+
+**READ THIS BEFORE USING:**
+
+- 🔴 **FINANCIAL RISK**: Trading cryptocurrency involves substantial risk of loss. Only use funds you can afford to lose.
+- 🔴 **NO GUARANTEES**: Past performance does not guarantee future results. The bot can lose money.
+- 🔴 **ALPHA SOFTWARE**: This is experimental software. Bugs may exist that could result in financial loss.
+- 🔴 **API KEY SECURITY**: Never share your API keys or private keys. Store credentials securely.
+- 🔴 **START SMALL**: Always test with minimal amounts first (e.g., $10-50) before scaling up.
+- 🔴 **ACTIVE MONITORING**: Do not run unattended with significant capital. Monitor regularly.
+- 🔴 **YOUR RESPONSIBILITY**: You are solely responsible for any financial losses incurred.
+
+**RECOMMENDED APPROACH:**
+1. Test on testnet first (if available)
+2. Start with $10-50 on mainnet
+3. Monitor actively for 1-2 weeks
+4. Gradually increase position sizes only after confidence is established
+
+---
+
+## Prerequisites
+
+Before installation, ensure you have:
+
+- **Rust 1.70+** - [Install Rust](https://rustup.rs/)
+- **Python 3.8+** - Required for order signing
+- **pip** - Python package manager
+- **Extended DEX Account** - [Sign up here](https://app.extended.exchange/join/FREQTRADE) (10% commission discount on first $50M volume)
+- **Pacifica Account** - [Sign up here](https://app.pacifica.fi/) with referral codes:
   ```
-  411J9J7CYNFZN3SX
-  2K7D40A9H53M2TJT
-  S1G3A2063Q7410BV
-  5KH0XDRD8BDGTBCT
-  S1YHDS2GWAJTWJ4M
-  7KB69JEC3BSA6GTR
+  411J9J7CYNFZN3SX  2K7D40A9H53M2TJT  S1G3A2063Q7410BV
+  5KH0XDRD8BDGTBCT  S1YHDS2GWAJTWJ4M  7KB69JEC3BSA6GTR
   ```
+- **Funded Accounts** - Collateral on both exchanges (USDC recommended)
+- **API Keys** - Generated from both exchange dashboards
+
+---
 
 ## 🤖 Autonomous Trading Bot
 
@@ -24,60 +52,116 @@ The main feature is a **fully automated funding rate arbitrage bot** that:
 - 💾 Persists state for crash recovery
 - 📊 Displays real-time PnL and position status
 
-**Live Example**: Currently running with $99 capital, earning 9.53% APR on ETH funding rate differential.
+**Example**: Bot can run autonomously with small capital amounts to capture funding rate differentials. Results vary based on market conditions.
 
-## Quick Start: Running the Bot
+---
 
-### 1. Install Python Dependencies
+## Installation & Quick Start
 
-The bot uses Python scripts for Starknet order signing (SNIP-12). Install the required packages:
+### 1. Clone and Setup Repository
 
 ```bash
+git clone <repository-url>
+cd DELTRA_NEUTRAL_EXTENDED_PACIFICA_RUST
+```
+
+### 2. Install Python Dependencies
+
+The bot requires Python for Starknet SNIP-12 order signing. Set up a virtual environment (recommended):
+
+```bash
+# Create virtual environment
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
 pip install -r requirements.txt
+
+# Install Extended DEX Python SDK
+cd python_sdk-starknet
+pip install -e .
+cd ..
 ```
 
-### 2. Setup Credentials
+**Why Python?** The Extended DEX uses SNIP-12 signatures which require the official Python SDK for compatibility. The Rust code calls a Python subprocess for signing.
 
-Create `.env` file:
+### 3. Setup Credentials
+
+**SECURITY NOTE:** Never commit your `.env` file to git. It's already in `.gitignore`.
+
+Copy the example and fill in your credentials:
+
 ```bash
-# Extended DEX
-API_KEY=your_extended_api_key
-STARK_PRIVATE=0x...
-STARK_PUBLIC=0x...
-VAULT_NUMBER=your_vault_number
-
-# Pacifica
-SOL_WALLET=your_solana_wallet
-API_PUBLIC=your_pacifica_public_key
-API_PRIVATE=your_pacifica_private_key
+cp .env.example .env
 ```
 
-### 3. Configure Filters
+Edit `.env` with your actual credentials:
+```bash
+# Extended DEX (from https://app.extended.exchange/)
+API_KEY=your_api_key_here
+STARK_PRIVATE=0xYOUR_PRIVATE_KEY
+STARK_PUBLIC=0xYOUR_PUBLIC_KEY
+VAULT_NUMBER=123456
 
-Edit `config.json`:
+# Pacifica (from https://app.pacifica.fi/)
+SOL_WALLET=YourSolanaWalletAddress
+API_PUBLIC=YourAgentWalletPublicKey
+API_PRIVATE=YourAgentWalletPrivateKey
+```
+
+**How to get credentials:**
+- **Extended DEX**: Dashboard → API Keys → Generate New Key
+- **Pacifica**: Settings → API Management → Create Agent Wallet
+
+### 4. Configure Trading Parameters
+
+Edit `config.json` to set your risk parameters:
 ```json
 {
   "filters": {
-    "min_combined_volume_usd": 50000000,
+    "min_combined_volume_usd": 20000000,
     "max_intra_exchange_spread_pct": 0.15,
     "max_cross_exchange_spread_pct": 0.25,
     "min_net_apr_pct": 5.0
+  },
+  "trading": {
+    "max_position_size_usd": 1000.0
   }
 }
 ```
 
-### 4. Run the Bot
+**Parameter Guide:**
+- `min_combined_volume_usd`: Minimum 24h trading volume (lower = more opportunities, higher slippage risk)
+- `max_intra_exchange_spread_pct`: Maximum bid-ask spread within each exchange (tighter = better execution)
+- `max_cross_exchange_spread_pct`: Maximum price difference between exchanges (prevents arbitrage execution risk)
+- `min_net_apr_pct`: Minimum net APR after costs (higher = fewer but more profitable opportunities)
+- `max_position_size_usd`: Cap on position size per exchange (risk management)
 
+### 5. Build and Run
+
+**First, test the build:**
 ```bash
-cargo run
+cargo build --release
 ```
 
-That's it! The bot will:
+**Run the bot:**
+```bash
+cargo run --release
+```
+
+Or run directly:
+```bash
+./target/release/extended_connector
+```
+
+**The bot will:**
 1. ✅ Load credentials and configuration
 2. 🔍 Scan for best opportunity immediately
-3. 📊 Open delta neutral position
-4. ⏱️ Monitor every 15 minutes
-5. 🔄 Rotate after 48 hours
+3. 📊 Open delta neutral position (if opportunity found)
+4. ⏱️ Monitor every 15 minutes and display status
+5. 🔄 Automatically rotate to new opportunities after 48 hours
+
+**To stop the bot:** Press `Ctrl+C` (will attempt to close positions gracefully)
 
 ## Features
 
@@ -429,6 +513,117 @@ Common trading pairs:
 - **Order Execution**: ~1-2 seconds per exchange
 - **Monitoring Interval**: 15 minutes
 - **State Persistence**: <100ms
+
+---
+
+## Troubleshooting
+
+### Bot Won't Start
+
+**Problem: "STARK_PRIVATE must be set in .env"**
+- **Solution**: Ensure `.env` file exists and contains all required credentials
+- Check: `ls -la .env` to verify file exists
+- Verify format matches `.env.example`
+
+**Problem: "Failed to spawn Python process"**
+- **Solution**: Python not in PATH or wrong version
+- Check: `python --version` (should be 3.8+)
+- Try: `python3` instead of `python` in your PATH
+
+**Problem: "No module named 'fast_stark_crypto'"**
+- **Solution**: Python dependencies not installed correctly
+- Run: `pip install -r requirements.txt`
+- Then: `cd python_sdk-starknet && pip install -e . && cd ..`
+
+**Problem: "No opportunities found matching criteria"**
+- **Solution**: Filters too restrictive or low market volatility
+- Try: Lower `min_combined_volume_usd` to 10000000 (10M)
+- Try: Increase `max_intra_exchange_spread_pct` to 0.25
+- Try: Lower `min_net_apr_pct` to 3.0
+
+### Bot Crashes or Stops
+
+**Problem: Bot exits with "Insufficient capital to open position"**
+- **Solution**: Not enough free collateral on one or both exchanges
+- Check balances on both exchange dashboards
+- Ensure at least $100-200 free collateral on each
+- Lower `max_position_size_usd` in config.json
+
+**Problem: "Failed to close Extended position after 5 attempts"**
+- **Solution**: Network issues or API rate limiting
+- Check: Extended DEX status page
+- Wait 5-10 minutes and restart bot
+- Bot will attempt to close on next cycle
+
+**Problem: Bot shows position but can't find it on exchange**
+- **Solution**: Check `bot_state.json` and verify on exchange dashboards
+- If position doesn't exist, manually edit or delete `bot_state.json`
+- **CAUTION**: Only delete state file if you're certain no positions are open
+
+### Order Placement Issues
+
+**Problem: "Python signing failed"**
+- **Solution**: Issue with order signing script
+- Check: `python scripts/sign_order.py` for errors
+- Verify: STARK keys are correct (compare with exchange dashboard)
+- Try: Regenerate API keys on Extended DEX
+
+**Problem: Orders rejected by exchange**
+- **Solution**: Insufficient margin, invalid size, or API key permissions
+- Check: API key has trading permissions enabled
+- Check: Lot size meets exchange minimum (typically 0.001-0.01)
+- Check: Free collateral > position size + fees
+
+### Performance Issues
+
+**Problem: Bot scans taking > 30 seconds**
+- **Solution**: Network latency or API rate limits
+- Increase: `fetch_timeout_seconds` to 60 in config.json
+- Increase: `rate_limit_delay_ms` to 200-500
+- Check: Your internet connection speed
+
+**Problem: High memory usage**
+- **Solution**: Normal for Rust async runtime, but can optimize
+- Try: Running with `--release` flag (optimization enabled)
+- Monitor: `htop` or Task Manager for actual usage
+
+### Data / State Issues
+
+**Problem: Bot keeps opening same position**
+- **Solution**: State file corruption
+- Stop bot (Ctrl+C)
+- Backup: `cp bot_state.json bot_state.json.backup`
+- Delete: `rm bot_state.json`
+- Restart bot
+
+**Problem: PnL not displaying correctly**
+- **Solution**: Exchange API may be slow to update
+- Wait: 1-2 minutes after position opens
+- Check: Positions directly on exchange dashboards
+- Verify: Both positions are actually open
+
+### Getting Help
+
+If problems persist:
+
+1. **Check Logs**: Bot outputs detailed logs to console
+2. **Enable Verbose Logging**: Set `RUST_LOG=debug` environment variable
+3. **Check Exchange Status**:
+   - Extended: https://status.extended.exchange (if available)
+   - Pacifica: https://status.pacifica.fi (if available)
+4. **Review Bot State**: `cat bot_state.json | jq` (if jq installed)
+5. **GitHub Issues**: Open an issue with:
+   - Error messages (redact private keys!)
+   - Bot configuration (redact credentials!)
+   - Steps to reproduce
+
+**Emergency Stop:**
+- Press `Ctrl+C` to stop bot
+- Bot will attempt graceful shutdown
+- Manually close positions on exchange dashboards if needed
+- Check both exchanges to verify no open positions remain
+
+---
 
 ## Documentation
 

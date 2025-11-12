@@ -45,7 +45,61 @@ impl Config {
             .map_err(|e| format!("Failed to read {}: {}", path, e))?;
         let config: Config = serde_json::from_str(&config_str)
             .map_err(|e| format!("Failed to parse {}: {}", path, e))?;
+
+        // Validate configuration parameters
+        config.validate()?;
+
         Ok(config)
+    }
+
+    /// Validate configuration parameters for sanity
+    pub fn validate(&self) -> Result<(), Box<dyn std::error::Error>> {
+        // Validate filters
+        if self.filters.min_combined_volume_usd < 0.0 {
+            return Err("min_combined_volume_usd must be non-negative".into());
+        }
+        if self.filters.min_combined_volume_usd > 1_000_000_000_000.0 {
+            return Err("min_combined_volume_usd is unrealistically high (>$1T)".into());
+        }
+
+        if self.filters.max_intra_exchange_spread_pct < 0.0 {
+            return Err("max_intra_exchange_spread_pct must be non-negative".into());
+        }
+        if self.filters.max_intra_exchange_spread_pct > 100.0 {
+            return Err("max_intra_exchange_spread_pct cannot exceed 100%".into());
+        }
+
+        if self.filters.max_cross_exchange_spread_pct < 0.0 {
+            return Err("max_cross_exchange_spread_pct must be non-negative".into());
+        }
+        if self.filters.max_cross_exchange_spread_pct > 100.0 {
+            return Err("max_cross_exchange_spread_pct cannot exceed 100%".into());
+        }
+
+        if self.filters.min_net_apr_pct < -1000.0 {
+            return Err("min_net_apr_pct is unrealistically low (<-1000%)".into());
+        }
+        if self.filters.min_net_apr_pct > 100000.0 {
+            return Err("min_net_apr_pct is unrealistically high (>100,000%)".into());
+        }
+
+        // Validate trading config
+        if self.trading.max_position_size_usd <= 0.0 {
+            return Err("max_position_size_usd must be positive".into());
+        }
+        if self.trading.max_position_size_usd > 10_000_000.0 {
+            return Err("max_position_size_usd is very high (>$10M). Please verify this is intentional.".into());
+        }
+
+        // Validate performance config
+        if self.performance.fetch_timeout_seconds == 0 {
+            return Err("fetch_timeout_seconds must be positive".into());
+        }
+        if self.performance.fetch_timeout_seconds > 600 {
+            return Err("fetch_timeout_seconds is very high (>10 minutes)".into());
+        }
+
+        Ok(())
     }
 
     pub fn default_config() -> Self {
