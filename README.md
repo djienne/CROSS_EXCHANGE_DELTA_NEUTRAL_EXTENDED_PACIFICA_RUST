@@ -21,6 +21,37 @@
 
 ---
 
+## 📚 What is Delta Neutral Funding Rate Farming?
+
+**Delta neutral funding rate farming** is a crypto trading strategy that earns funding payments while staying market neutral:
+
+### How It Works
+1. **Open opposite positions** - Simultaneously go LONG on one exchange and SHORT on another for the same asset (e.g., BTC)
+2. **Stay market neutral** - Price movements cancel out, so you're not exposed to market direction
+3. **Earn funding rates** - Perpetual futures exchanges charge/pay funding rates every 8 hours between longs and shorts
+4. **Capture the spread** - When one exchange pays more than the other charges, you profit
+
+### Simple Example
+- **Extended DEX**: Open LONG ETH position (receive +0.05% funding/8h)
+- **Pacifica**: Open SHORT ETH position (pay -0.02% funding/8h)
+- **Net profit**: 0.03% every 8 hours (~32% APR) regardless of ETH price movement
+
+### Key Benefits
+✅ **Market neutral** - No exposure to price swings
+✅ **Predictable returns** - Funding rates are known in advance
+✅ **Automated** - This bot handles everything: scanning, trading, monitoring
+✅ **Risk management** - Built-in filters for spreads, volume, and minimum APR
+
+### Risks to Understand
+⚠️ **Execution risk** - Price gaps between exchanges when opening/closing
+⚠️ **Funding rate changes** - Rates can flip, turning profits into losses
+⚠️ **Exchange risk** - Both exchanges must remain operational
+⚠️ **Liquidation risk** - Extreme price moves could liquidate one position
+
+This bot automates the entire process: finding opportunities, opening positions, monitoring funding payments, and rotating to better opportunities every 48 hours.
+
+---
+
 ## Prerequisites
 
 Before installation, ensure you have:
