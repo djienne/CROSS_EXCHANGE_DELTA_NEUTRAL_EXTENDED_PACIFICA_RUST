@@ -25,6 +25,7 @@ pub struct FilterConfig {
 #[derive(Debug, Deserialize, Clone)]
 pub struct TradingConfig {
     pub max_position_size_usd: f64,
+    pub hold_time_hours: u64,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -90,6 +91,12 @@ impl Config {
         if self.trading.max_position_size_usd > 10_000_000.0 {
             return Err("max_position_size_usd is very high (>$10M). Please verify this is intentional.".into());
         }
+        if self.trading.hold_time_hours == 0 {
+            return Err("hold_time_hours must be positive".into());
+        }
+        if self.trading.hold_time_hours > 720 {
+            return Err("hold_time_hours is very high (>30 days). Please verify this is intentional.".into());
+        }
 
         // Validate performance config
         if self.performance.fetch_timeout_seconds == 0 {
@@ -112,6 +119,7 @@ impl Config {
             },
             trading: TradingConfig {
                 max_position_size_usd: 1000.0,
+                hold_time_hours: 48,
             },
             display: DisplayConfig {
                 max_opportunities_shown: 10,
