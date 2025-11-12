@@ -23,32 +23,46 @@
 
 ## 📚 What is Delta Neutral Funding Rate Farming?
 
-**Delta neutral funding rate farming** is a crypto trading strategy that earns funding payments while staying market neutral:
+**Delta neutral funding rate farming** is a crypto trading strategy that earns passive income from funding rate differentials across exchanges while remaining market neutral.
+
+### The Concept
+
+Perpetual futures contracts use **funding rates** to keep their prices anchored to spot prices. Every 8 hours, depending on market sentiment:
+- When longs outnumber shorts → longs **pay** shorts (negative funding)
+- When shorts outnumber longs → shorts **pay** longs (positive funding)
+
+Different exchanges often have different funding rates for the same asset. This creates an arbitrage opportunity.
 
 ### How It Works
-1. **Open opposite positions** - Simultaneously go LONG on one exchange and SHORT on another for the same asset (e.g., BTC)
-2. **Stay market neutral** - Price movements cancel out, so you're not exposed to market direction
-3. **Earn funding rates** - Perpetual futures exchanges charge/pay funding rates every 8 hours between longs and shorts
-4. **Capture the spread** - When one exchange pays more than the other charges, you profit
+1. **Identify the spread** - Find two exchanges where one pays significantly more than the other
+2. **Open opposite positions** - Go LONG on the exchange with positive funding, SHORT on the exchange with negative funding
+3. **Stay market neutral** - Because you're both long and short on the same asset, price movements cancel out
+4. **Collect the difference** - Every 8 hours, you receive funding on one side and pay on the other, pocketing the spread
 
 ### Simple Example
-- **Extended DEX**: Open LONG ETH position (receive +0.05% funding/8h)
-- **Pacifica**: Open SHORT ETH position (pay -0.02% funding/8h)
-- **Net profit**: 0.03% every 8 hours (~32% APR) regardless of ETH price movement
+**Scenario**: ETH funding rates differ across exchanges
+- **Exchange A**: +0.05% funding rate (you go LONG and receive payment)
+- **Exchange B**: -0.02% funding rate (you go SHORT and pay)
+- **Your net profit**: 0.03% every 8 hours = 0.09% daily = **~32% APR**
 
-### Key Benefits
-✅ **Market neutral** - No exposure to price swings
-✅ **Predictable returns** - Funding rates are known in advance
-✅ **Automated** - This bot handles everything: scanning, trading, monitoring
-✅ **Risk management** - Built-in filters for spreads, volume, and minimum APR
+Regardless of whether ETH goes up or down, your positions offset each other while you collect the funding spread.
 
-### Risks to Understand
-⚠️ **Execution risk** - Price gaps between exchanges when opening/closing
-⚠️ **Funding rate changes** - Rates can flip, turning profits into losses
-⚠️ **Exchange risk** - Both exchanges must remain operational
-⚠️ **Liquidation risk** - Extreme price moves could liquidate one position
+### Why It Works
+✅ **Market inefficiency** - Different exchanges have different trader ratios and market dynamics
+✅ **No directional risk** - You're hedged against price movements
+✅ **Predictable income** - Funding rates are published in advance
+✅ **Scalable** - Works with any position size (subject to liquidity)
 
-This bot automates the entire process: finding opportunities, opening positions, monitoring funding payments, and rotating to better opportunities every 48 hours.
+### Important Risks
+⚠️ **Funding rate reversals** - Rates can change and turn against you
+⚠️ **Execution risk** - Opening/closing positions at different prices creates P&L impact
+⚠️ **Spread risk** - Wide bid-ask spreads eat into profits
+⚠️ **Exchange risk** - Counterparty risk if an exchange fails or halts withdrawals
+⚠️ **Liquidation risk** - Extreme price movements could liquidate one leg before you can react
+⚠️ **Capital inefficiency** - Requires collateral on both exchanges
+
+### This Bot's Role
+This bot automates the entire workflow: scanning multiple exchanges for opportunities, executing positions simultaneously, monitoring funding payments, and managing position lifecycle to maximize returns while minimizing risks.
 
 ---
 
