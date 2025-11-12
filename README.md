@@ -1,6 +1,6 @@
 # Extended DEX and Pacifica Funding Rate Farming Bot
 
-**An autonomous trading bot for delta neutral funding rate arbitrage between Extended DEX (Starknet) and Pacifica, plus a comprehensive Rust connector library for both exchanges.**
+**An autonomous trading bot for delta neutral funding rate farming between Extended DEX (Starknet) and Pacifica, plus a comprehensive Rust connector library for both exchanges.**
 
 ---
 
@@ -33,7 +33,7 @@ Before installation, ensure you have:
 
 ## 🤖 Autonomous Trading Bot
 
-The main feature is a **fully automated funding rate arbitrage bot** that:
+The main feature is a **fully automated funding rate farming bot** that:
 - 🔍 Scans markets every 15 minutes for best opportunities
 - 💰 Opens delta neutral positions (95% of available capital)
 - ⏱️ Holds positions for 48 hours to capture funding payments
@@ -155,7 +155,7 @@ Or run directly:
 ## Features
 
 ### Autonomous Trading Bot
-- ✅ **Delta Neutral Arbitrage** - Simultaneous long/short positions across exchanges
+- ✅ **Delta Neutral Farming** - Simultaneous long/short positions across exchanges
 - ✅ **Opportunity Scanner** - Real-time scanning with multi-stage filtering
 - ✅ **Position Management** - Automated opening, monitoring, and closing
 - ✅ **State Persistence** - JSON-based state for crash recovery (`bot_state.json`)
@@ -177,7 +177,7 @@ Or run directly:
 - ✅ **Orderbook Streaming** - Real-time orderbook updates
 - ✅ **Position Management** - Monitor and close positions
 
-### Arbitrage Tools
+### Farming Tools
 - ✅ **Opportunity Finder** - Configurable filtering (volume, spreads, APR)
 - ✅ **Parallel Fetching** - Concurrent API calls for fast scanning
 - ✅ **Strategy Selection** - Automatic long/short direction optimization
