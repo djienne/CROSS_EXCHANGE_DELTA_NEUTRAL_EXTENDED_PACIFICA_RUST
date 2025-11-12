@@ -205,6 +205,7 @@ Or run directly:
 - ✅ **Delta Neutral Farming** - Simultaneous long/short positions across exchanges
 - ✅ **Opportunity Scanner** - Real-time scanning with multi-stage filtering
 - ✅ **Position Management** - Automated opening, monitoring, and closing
+- ✅ **Emergency Exit** - Instant position closure tool with automatic retries
 - ✅ **State Persistence** - JSON-based state for crash recovery (`bot_state.json`)
 - ✅ **Retry Logic** - 5 attempts with exponential backoff for reliable execution
 - ✅ **Monitoring** - 15-minute status updates with PnL tracking
@@ -321,6 +322,20 @@ cargo run --example check_spreads
 cargo run --example check_cross_spreads
 ```
 
+### Emergency Tools
+
+```bash
+# Emergency exit - closes ALL positions immediately
+cargo run --bin emergency_exit
+
+# Force rotation - triggers bot to close on next cycle
+cargo run --bin force_rotation
+```
+
+**Emergency Exit**: Closes all open positions on both exchanges using the bot's proven close logic. Includes automatic retries and detailed status reporting. Use in case of market emergencies or when you need to exit all positions quickly.
+
+**Force Rotation**: Modifies `bot_state.json` to set rotation time 49 hours ago, causing the bot to close positions on its next monitoring cycle (within 15 minutes). Safer alternative if emergency_exit fails.
+
 ## Library Usage
 
 ### REST API - Get Orderbook
@@ -425,6 +440,9 @@ src/
 ├── opportunity.rs         # Opportunity scanner
 ├── trading.rs             # Position execution logic
 ├── bot.rs                 # Bot orchestration & state
+├── bin/                   # Standalone binaries
+│   ├── emergency_exit.rs  # Emergency position closer
+│   └── force_rotation.rs  # Force rotation trigger
 ├── snip12/                # SNIP-12 signing implementation
 └── pacifica/              # Pacifica exchange integration
     ├── client.rs          # Orderbook WebSocket
@@ -441,6 +459,7 @@ examples/
 
 config.json                # Bot configuration
 bot_state.json            # Bot state (auto-generated)
+EMERGENCY_EXIT.txt        # Emergency command reference
 ```
 
 ## API Reference
@@ -519,7 +538,12 @@ cat bot_state.json
 
 # Scan without trading
 cargo run --example scan_opportunities
+
+# Emergency close all positions (if needed)
+cargo run --bin emergency_exit
 ```
+
+**Testing Emergency Exit**: You can test the emergency exit tool by running it when you have an active position. It will close both positions and provide detailed status. For safety, always test with small positions first.
 
 ## Supported Markets
 
