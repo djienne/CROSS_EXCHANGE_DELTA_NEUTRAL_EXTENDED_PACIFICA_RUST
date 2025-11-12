@@ -4,23 +4,16 @@
 
 ---
 
-## ⚠️ IMPORTANT SECURITY & RISK WARNINGS
+## 🎁 Get Exclusive Referral Benefits
 
-**READ THIS BEFORE USING:**
+**Extended DEX** - [Sign up here](https://app.extended.exchange/join/FREQTRADE)
+- 10% commission discount on first $50M volume
 
-- 🔴 **FINANCIAL RISK**: Trading cryptocurrency involves substantial risk of loss. Only use funds you can afford to lose.
-- 🔴 **NO GUARANTEES**: Past performance does not guarantee future results. The bot can lose money.
-- 🔴 **ALPHA SOFTWARE**: This is experimental software. Bugs may exist that could result in financial loss.
-- 🔴 **API KEY SECURITY**: Never share your API keys or private keys. Store credentials securely.
-- 🔴 **START SMALL**: Always test with minimal amounts first (e.g., $10-50) before scaling up.
-- 🔴 **ACTIVE MONITORING**: Do not run unattended with significant capital. Monitor regularly.
-- 🔴 **YOUR RESPONSIBILITY**: You are solely responsible for any financial losses incurred.
-
-**RECOMMENDED APPROACH:**
-1. Test on testnet first (if available)
-2. Start with $10-50 on mainnet
-3. Monitor actively for 1-2 weeks
-4. Gradually increase position sizes only after confidence is established
+**Pacifica** - [Sign up here](https://app.pacifica.fi/) with referral codes:
+```
+411J9J7CYNFZN3SX  2K7D40A9H53M2TJT  S1G3A2063Q7410BV
+5KH0XDRD8BDGTBCT  S1YHDS2GWAJTWJ4M  7KB69JEC3BSA6GTR
+```
 
 ---
 
@@ -31,12 +24,8 @@ Before installation, ensure you have:
 - **Rust 1.70+** - [Install Rust](https://rustup.rs/)
 - **Python 3.8+** - Required for order signing
 - **pip** - Python package manager
-- **Extended DEX Account** - [Sign up here](https://app.extended.exchange/join/FREQTRADE) (10% commission discount on first $50M volume)
-- **Pacifica Account** - [Sign up here](https://app.pacifica.fi/) with referral codes:
-  ```
-  411J9J7CYNFZN3SX  2K7D40A9H53M2TJT  S1G3A2063Q7410BV
-  5KH0XDRD8BDGTBCT  S1YHDS2GWAJTWJ4M  7KB69JEC3BSA6GTR
-  ```
+- **Extended DEX Account** - Create using referral link above
+- **Pacifica Account** - Create using referral codes above
 - **Funded Accounts** - Collateral on both exchanges (USDC recommended)
 - **API Keys** - Generated from both exchange dashboards
 
@@ -639,6 +628,27 @@ MIT
 ## Contributing
 
 Contributions welcome! Please open an issue or PR.
+
+---
+
+## ⚠️ IMPORTANT SECURITY & RISK WARNINGS
+
+**READ THIS BEFORE USING:**
+
+- 🔴 **FINANCIAL RISK**: Trading cryptocurrency involves substantial risk of loss. Only use funds you can afford to lose.
+- 🔴 **NO GUARANTEES**: Past performance does not guarantee future results. The bot can lose money.
+- 🔴 **ALPHA SOFTWARE**: This is experimental software. Bugs may exist that could result in financial loss.
+- 🔴 **API KEY SECURITY**: Never share your API keys or private keys. Store credentials securely.
+- 🔴 **START SMALL**: Always test with minimal amounts first (e.g., $10-50) before scaling up.
+- 🔴 **ACTIVE MONITORING**: Do not run unattended with significant capital. Monitor regularly.
+- 🔴 **YOUR RESPONSIBILITY**: You are solely responsible for any financial losses incurred.
+
+**RECOMMENDED APPROACH:**
+1. Start with $10-50
+2. Monitor actively for 1-2 weeks
+3. Gradually increase position sizes only after confidence is established
+
+---
 
 ## Disclaimer
 
