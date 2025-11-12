@@ -2,6 +2,10 @@
 
 **An autonomous trading bot for delta neutral funding rate farming between Extended DEX (Starknet) and Pacifica, plus a comprehensive Rust connector library for both exchanges.**
 
+<p align="center">
+  <img src="screen.png" alt="Bot Screenshot" width="700">
+</p>
+
 ---
 
 ## 🎁 Get Exclusive Referral Benefits
