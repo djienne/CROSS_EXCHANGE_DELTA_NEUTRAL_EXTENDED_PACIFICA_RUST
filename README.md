@@ -61,8 +61,19 @@ Regardless of whether ETH goes up or down, your positions offset each other whil
 ⚠️ **Liquidation risk** - Extreme price movements could liquidate one leg before you can react
 ⚠️ **Capital inefficiency** - Requires collateral on both exchanges
 
-### This Bot's Role
-This bot automates the entire workflow: scanning multiple exchanges for opportunities, executing positions simultaneously, monitoring funding payments, and managing position lifecycle to maximize returns while minimizing risks.
+### This Bot's Strategy
+This bot uses a **48-hour rotation cycle** with multiple objectives:
+
+1. **Generate trading volume** - Regular position rotation creates volume across different assets, which can qualify for potential exchange airdrops and rewards programs
+2. **Diversify exposure** - Rotating through different assets (BTC, ETH, SOL, etc.) reduces concentration risk
+3. **Capture funding spreads** - Earn funding rate differentials as a bonus while maintaining positions
+4. **Stay market neutral** - All positions are delta neutral, minimizing directional price risk
+
+The 48-hour cycle is intentionally short - not to maximize funding returns (which would require longer holding periods), but to generate consistent volume across multiple markets while staying hedged. This approach is ideal for:
+- Farming potential airdrops through volume and activity
+- Maintaining diversified positions across assets
+- Earning funding spreads as a secondary benefit
+- Minimizing risk exposure through constant rebalancing
 
 ---
 
