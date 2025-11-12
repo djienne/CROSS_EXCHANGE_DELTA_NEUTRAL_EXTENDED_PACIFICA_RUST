@@ -244,7 +244,7 @@ Or run directly:
 2. 🔍 Scan for best opportunity immediately
 3. 📊 Open delta neutral position (if opportunity found)
 4. ⏱️ Monitor every 15 minutes and display status
-5. 🔄 Automatically rotate to new opportunities after 48 hours
+5. 🔄 Automatically rotate to new opportunities after configured hold time (default 48 hours)
 
 **To stop the bot:** Press `Ctrl+C` (will attempt to close positions gracefully)
 
@@ -298,26 +298,7 @@ tokio = { version = "1.42", features = ["full"] }
 
 ## Configuration
 
-### config.json
-
-```json
-{
-  "filters": {
-    "min_combined_volume_usd": 50000000,      // $50M minimum 24h volume
-    "max_intra_exchange_spread_pct": 0.15,    // 0.15% max spread within exchange
-    "max_cross_exchange_spread_pct": 0.25,    // 0.25% max price difference
-    "min_net_apr_pct": 5.0                    // 5% minimum net APR
-  },
-  "display": {
-    "max_opportunities_shown": 10,
-    "show_filtered_out_count": true
-  },
-  "performance": {
-    "fetch_timeout_seconds": 30,
-    "rate_limit_delay_ms": 100
-  }
-}
-```
+See the [Configure Trading Parameters](#4-configure-trading-parameters) section above for the complete `config.json` reference.
 
 ### Bot Behavior
 
