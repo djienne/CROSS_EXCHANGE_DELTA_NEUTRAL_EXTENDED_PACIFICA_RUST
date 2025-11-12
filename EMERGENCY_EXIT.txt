@@ -1,0 +1,53 @@
+╔═══════════════════════════════════════════════════════════════╗
+║                    EMERGENCY EXIT COMMAND                     ║
+╚═══════════════════════════════════════════════════════════════╝
+
+⚠️  WARNING: This will close ALL positions on BOTH exchanges!
+
+COMMAND TO RUN:
+---------------
+
+cargo run --bin emergency_exit
+
+
+FASTER OPTION (pre-built release):
+-----------------------------------
+
+cargo build --release --bin emergency_exit
+.\target\release\emergency_exit.exe
+
+
+WHAT IT DOES:
+-------------
+- Gives you 3 seconds to abort (Ctrl+C)
+- Loads bot configuration and credentials
+- Uses the bot's PROVEN close logic (with working signatures)
+- Displays current positions
+- Closes all positions using the same code the bot uses daily
+- Reports success/failure
+
+
+WHY THIS WORKS:
+---------------
+- Uses bot's working order placement code
+- Same signature logic that successfully opened positions
+- More reliable than direct API calls
+- Properly handles all edge cases
+
+
+ALTERNATIVES IF IT FAILS:
+--------------------------
+
+1. Force Rotation (triggers bot to close on next cycle):
+   cargo run --bin force_rotation
+
+2. Manual Web Interface:
+   - Extended: https://app.extended.exchange
+   - Pacifica: https://app.pacifica.fi
+
+
+PREREQUISITES:
+--------------
+- .env file must be configured with all credentials
+- config.json must exist in project root
+- Must be run from project root directory
