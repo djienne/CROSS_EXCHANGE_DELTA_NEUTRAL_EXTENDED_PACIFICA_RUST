@@ -1,4 +1,4 @@
-# Extended DEX Connector & Funding Rate Arbitrage Bot
+# Extended DEX and Pacifica Funding Rate Farming Bot
 
 **An autonomous trading bot for delta neutral funding rate arbitrage between Extended DEX (Starknet) and Pacifica, plus a comprehensive Rust connector library for both exchanges.**
 
