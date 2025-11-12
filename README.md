@@ -107,19 +107,15 @@ cd DELTRA_NEUTRAL_EXTENDED_PACIFICA_RUST
 
 ### 2. Install Python Dependencies
 
-The bot requires Python for Starknet SNIP-12 order signing. Set up a virtual environment (recommended):
+The bot requires Python for Starknet SNIP-12 order signing:
 
 ```bash
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
 # Install dependencies
-pip install -r requirements.txt
+pip3 install -r requirements.txt
 
 # Install Extended DEX Python SDK
 cd python_sdk-starknet
-pip install -e .
+pip3 install -e .
 cd ..
 ```
 
