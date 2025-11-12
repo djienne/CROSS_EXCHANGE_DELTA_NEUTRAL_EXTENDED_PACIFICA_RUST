@@ -130,6 +130,8 @@ pub async fn open_delta_neutral_position(
     stark_private_key: &str,
     stark_public_key: &str,
     vault_id: &str,
+    extended_lot_size: f64,  // Extended size increment (e.g., 0.001)
+    pacifica_lot_size: f64,  // Pacifica lot size (e.g., 0.01)
 ) -> Result<DeltaNeutralPosition> {
     info!("Opening delta neutral position for {}", symbol);
     info!("Strategy: {} Extended / {} Pacifica",
@@ -144,17 +146,26 @@ pub async fn open_delta_neutral_position(
         )));
     }
 
-    let notional_usd = position_size_base * current_price;
+    // Round to each exchange's lot size to ensure consistency
+    // This prevents rounding discrepancies when Extended recalculates from USD
+    let extended_rounded_size = (position_size_base / extended_lot_size).round() * extended_lot_size;
+    let pacifica_rounded_size = (position_size_base / pacifica_lot_size).round() * pacifica_lot_size;
+
+    // Calculate notional from Extended's rounded size to ensure Extended gets exact amount after its own rounding
+    let notional_usd = extended_rounded_size * current_price;
+
     info!("Opening position: {:.6} {} (${:.2})", position_size_base, symbol, notional_usd);
+    info!("Exchange-specific rounding - Extended: {:.6}, Pacifica: {:.6}",
+          extended_rounded_size, pacifica_rounded_size);
 
     // Step 1: Place first order (Extended)
     let extended_side = if long_on_extended { OrderSide::Buy } else { OrderSide::Sell };
-    info!("Placing Extended order: {:?} {:.6} {} @ market", extended_side, position_size_base, symbol);
+    info!("Placing Extended order: {:?} {:.6} {} @ market", extended_side, extended_rounded_size, symbol);
 
     let extended_order = extended_client.place_market_order(
         extended_market_symbol,
         extended_side,
-        notional_usd,
+        notional_usd,  // Using notional calculated from extended_rounded_size
         stark_private_key,
         stark_public_key,
         vault_id,
@@ -168,7 +179,7 @@ pub async fn open_delta_neutral_position(
     let slippage_percent = 0.5; // 0.5% slippage tolerance
 
     info!("Placing Pacifica order: {:?} {:.6} {} @ market (with {} retries)",
-        pacifica_side, position_size_base, symbol, 5);
+        pacifica_side, pacifica_rounded_size, symbol, 5);
 
     // Retry logic for Pacifica order (inline due to mutable reference)
     let mut pacifica_order = None;
@@ -176,7 +187,7 @@ pub async fn open_delta_neutral_position(
         match pacifica_client.place_market_order(
             pacifica_market_symbol,
             pacifica_side,
-            position_size_base,
+            pacifica_rounded_size,  // Using Pacifica's rounded size
             slippage_percent,
             false
         ).await {

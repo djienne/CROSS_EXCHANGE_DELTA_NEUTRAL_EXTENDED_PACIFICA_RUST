@@ -362,6 +362,8 @@ impl FundingBot {
             &self.stark_private_key,
             &self.stark_public_key,
             &self.vault_id,
+            extended_lot_size,
+            pacifica_lot_size,
         ).await.map_err(|e| format!("Failed to open position: {}", e))?;
 
         // Update state
