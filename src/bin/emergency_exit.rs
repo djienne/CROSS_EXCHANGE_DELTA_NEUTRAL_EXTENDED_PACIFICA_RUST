@@ -95,9 +95,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             error!("   1. Close manually via exchange web interfaces:");
             error!("      - Extended: https://app.extended.exchange");
             error!("      - Pacifica: https://app.pacifica.fi");
-            error!("   2. Try force_rotation: cargo run --bin force_rotation");
-            error!("      (Sets rotation time to force close on next bot cycle)");
-            error!("   3. Check error details above for specific issues");
+            error!("   2. Check error details above for specific issues");
             error!("\n⚠️  Some positions may still be open! Verify manually!");
 
             return Err(e);
