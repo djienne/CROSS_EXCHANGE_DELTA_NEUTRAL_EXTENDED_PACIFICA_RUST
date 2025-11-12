@@ -1,0 +1,53 @@
+# Git files
+.git/
+.gitignore
+.github/
+
+# Build artifacts
+target/
+**/*.rs.bk
+*.pdb
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+
+# State files (will be mounted as volumes)
+bot_state.json
+
+# Documentation
+*.md
+docs/
+README.md
+CLAUDE.md
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+
+# Docker files (no need to copy into image)
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Test files
+tests/
+benches/
+
+# CI/CD
+.gitlab-ci.yml
+.travis.yml
+azure-pipelines.yml
+
+# Misc
+*.tmp
+*.temp
+.cache/
