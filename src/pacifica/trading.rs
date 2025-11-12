@@ -508,7 +508,9 @@ impl PacificaTrading {
             "agent_wallet": self.credentials.agent_wallet
         });
 
-        debug!("[PACIFICA] Order request: {}", serde_json::to_string_pretty(&request_body)?);
+        // Avoid logging full request body (contains signature and keys)
+        debug!("[PACIFICA] Order request prepared (symbol: {}, side: {}, tif: ALO)",
+            symbol, side.as_str());
 
         // Send request
         let url = format!("{}/api/v1/orders/create", self.rest_url);
@@ -1012,7 +1014,8 @@ impl PacificaTrading {
             "signature": signature
         });
 
-        debug!("[PACIFICA] Sending update_leverage request: {}", request_body);
+        // Avoid logging full request body (contains signature and keys)
+        debug!("[PACIFICA] Sending update_leverage request (symbol: {}, leverage: {}x)", symbol, leverage);
 
         // Send request
         let url = format!("{}/api/v1/account/leverage", self.rest_url);

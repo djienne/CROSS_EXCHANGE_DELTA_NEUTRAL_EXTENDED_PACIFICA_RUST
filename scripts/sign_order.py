@@ -103,9 +103,8 @@ def sign_order(
 def main():
     """Read JSON from stdin, compute signature, write JSON to stdout"""
     try:
-        # Read input from stdin
+        # Read input from stdin (do not echo sensitive content)
         input_str = sys.stdin.read()
-        sys.stderr.write(f"Input: {input_str}\n")
         input_data = json.loads(input_str)
 
         # Extract parameters
@@ -127,8 +126,9 @@ def main():
             domain_revision=input_data.get("domain_revision", "1"),
         )
 
-        # Write result to stdout
-        print(json.dumps(result))
+        # Write minimal result to stdout (only what the Rust caller requires)
+        # Note: message_hash and expiration are not printed to stderr to avoid leaks
+        print(json.dumps({"r": result["r"], "s": result["s"]}))
         sys.exit(0)
 
     except Exception as e:

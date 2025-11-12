@@ -720,7 +720,7 @@ impl RestClient {
         // Use timestamp in seconds (current ~1.7B, fits well under 2^31 = 2.1B)
         let nonce = now.timestamp() as u64;
 
-        info!("Generated nonce: {} (max allowed: {})", nonce, 1u64 << 31);
+        // Do not log nonce values to avoid leaking signing metadata
 
         // 8. Set expiry (1 hour from now for market order)
         let expiry_epoch_millis = (chrono::Utc::now().timestamp_millis() + (3600 * 1000)) as u64;
@@ -775,13 +775,8 @@ impl RestClient {
 
         // 9. Submit order
         let url = format!("{}/user/order", self.base_url);
-        debug!("Submitting order to {}", url);
-        debug!("Order request: {:?}", order_request);
-
-        // Debug: print JSON
-        let json_str = serde_json::to_string_pretty(&order_request)
-            .unwrap_or_else(|_| "Failed to serialize".to_string());
-        println!("Order JSON:\n{}", json_str);
+        debug!("Submitting order to {} (id: {}, market: {}, side: {})",
+            url, order_id, market, match side { OrderSide::Buy => "BUY", OrderSide::Sell => "SELL" });
 
         let api_key = self.api_key.as_ref().ok_or_else(|| {
             ConnectorError::ApiError("API key required for order placement".to_string())
@@ -801,9 +796,8 @@ impl RestClient {
         let response_text = response.text().await?;
 
         debug!("Order response status: {}", status);
+        // Do not print full response body at info level; debug-only is acceptable and typically non-sensitive
         debug!("Order response body: {}", response_text);
-        println!("Response status: {}", status);
-        println!("Response body: {}", response_text);
 
         if !status.is_success() {
             error!("Order placement failed: {} - {}", status, response_text);

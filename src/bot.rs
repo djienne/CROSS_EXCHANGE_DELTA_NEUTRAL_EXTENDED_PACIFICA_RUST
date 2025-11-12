@@ -4,11 +4,13 @@ use crate::{
     trading::{open_delta_neutral_position, close_delta_neutral_position, calculate_position_size, DeltaNeutralPosition},
     OpportunityConfig,
 };
+use crate::pacifica::types::PacificaPosition;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 use std::time::Duration;
 use tokio::time::sleep;
+use futures_util::FutureExt;
 use tracing::{info, warn, error};
 
 const STATE_FILE: &str = "bot_state.json";
@@ -126,6 +128,61 @@ impl FundingBot {
             stark_public_key,
             vault_id,
         })
+    }
+
+    /// Reconcile saved state with live exchange positions.
+    /// If saved state indicates an active position but neither exchange has it,
+    /// clear the state to avoid erroneous closes/rotations. If only one leg exists,
+    /// keep that leg in state so a subsequent close will only act on the live leg.
+    pub async fn reconcile_state(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        let Some(saved_pos) = self.state.current_position.clone() else {
+            // Nothing to reconcile
+            return Ok(());
+        };
+
+        let symbol = saved_pos.symbol.clone();
+        let extended_market = format!("{}-USD", symbol);
+
+        // Query live positions on Extended (ignore errors to avoid false clearing)
+        let live_ext: Option<crate::types::Position> = match self
+            .extended_client
+            .get_positions(Some(&extended_market))
+            .await
+        {
+            Ok(list) => list.into_iter().find(|p| p.market == extended_market),
+            Err(e) => {
+                warn!("Skipping Extended reconciliation (could not fetch positions): {}", e);
+                None
+            }
+        };
+
+        // Query live position on Pacifica
+        let live_pac: Option<PacificaPosition> = match self.pacifica_client.get_position(&symbol).await {
+            Ok(pos_opt) => pos_opt,
+            Err(e) => {
+                warn!("Skipping Pacifica reconciliation (could not fetch positions): {}", e);
+                None
+            }
+        };
+
+        // If both legs are missing, clear state
+        if live_ext.is_none() && live_pac.is_none() {
+            warn!(
+                "State shows active {}, but no live positions found on either exchange. Clearing stale state.",
+                symbol
+            );
+            self.state.current_position = None;
+            self.state.save_to_file(STATE_FILE)?;
+            return Ok(());
+        }
+
+        // Otherwise, update state to reflect only the legs that actually exist
+        let mut updated = saved_pos.clone();
+        updated.extended_position = live_ext;
+        updated.pacifica_position = live_pac;
+        self.state.current_position = Some(updated);
+        self.state.save_to_file(STATE_FILE)?;
+        Ok(())
     }
 
     /// Display current status summary
@@ -332,6 +389,16 @@ impl FundingBot {
     /// Close the current position
     pub async fn close_current_position(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         if let Some(pos) = &self.state.current_position {
+            // Ensure state matches live positions before attempting close
+            self.reconcile_state().await.ok();
+
+            // If reconciliation cleared the state, nothing to do
+            if self.state.current_position.is_none() {
+                warn!("No live positions to close after reconciliation");
+                return Ok(());
+            }
+
+            let pos = self.state.current_position.as_ref().unwrap();
             info!("{} {}", "🔄 Closing current position:", pos.symbol);
 
             close_delta_neutral_position(
@@ -368,63 +435,19 @@ impl FundingBot {
             "hours");
         info!("{}", "🛑 Press Ctrl+C to stop gracefully");
 
-        // Setup graceful shutdown signal handler
-        let mut shutdown_signal = Box::pin(tokio::signal::ctrl_c());
-
         loop {
-            // Check for shutdown signal at the beginning of each iteration
-            tokio::select! {
-                result = &mut shutdown_signal => {
-                    match result {
-                        Ok(_) => {
-                            info!("{}", "");
-                            info!("{}", "🛑 Shutdown signal received. Stopping bot gracefully...");
-                            info!("{}", "⚠️  WARNING: The bot will stop, but WILL NOT automatically close positions.");
-                            info!("{}", "   You should manually close positions on the exchange dashboards if needed.");
-
-                            if self.state.current_position.is_some() {
-                                warn!("{}", "");
-                                warn!("{}", "⚠️  ACTIVE POSITION DETECTED!");
-                                warn!("{}", "   The bot has an active position. Shutdown options:");
-                                warn!("{}", "   1. Press Ctrl+C again to force quit immediately");
-                                warn!("{}", "   2. Wait 10 seconds to attempt graceful position close");
-                                warn!("{}", "");
-                                warn!("{}", "⏳ Waiting 10 seconds before attempting to close positions...");
-
-                                // Give user 10 seconds to force quit or let it close
-                                match tokio::time::timeout(
-                                    Duration::from_secs(10),
-                                    tokio::signal::ctrl_c()
-                                ).await {
-                                    Ok(_) => {
-                                        error!("{}", "⚠️  Force quit requested. Exiting immediately without closing positions.");
-                                        return Ok(());
-                                    }
-                                    Err(_) => {
-                                        info!("{}", "⏳ Attempting to close positions gracefully...");
-                                        if let Err(e) = self.close_current_position().await {
-                                            error!("{} {}", "❌ Failed to close position during shutdown:", e);
-                                            error!("{}", "   Please manually close positions on exchange dashboards!");
-                                        } else {
-                                            info!("{}", "✅ Positions closed successfully.");
-                                        }
-                                    }
-                                }
-                            }
-
-                            info!("{}", "👋 Bot stopped. Goodbye!");
-                            return Ok(());
-                        }
-                        Err(e) => {
-                            error!("Error setting up Ctrl+C handler: {}", e);
-                            return Err(Box::new(e) as Box<dyn std::error::Error>);
-                        }
-                    }
-                }
-                _ = async {} => {
-                    // Continue with normal bot operations
-                }
+            // Non-blocking check for Ctrl+C (gracefully exit; keep positions open)
+            if tokio::signal::ctrl_c().now_or_never().is_some() {
+                info!("{}", "");
+                info!("{}", "🛑 Shutdown signal received. Stopping bot gracefully...");
+                info!("{}", "ℹ️  Open positions (if any) will remain open.");
+                info!("{}", "   Manage them from the exchange dashboards or restart the bot.");
+                info!("{}", "👋 Bot stopped. Goodbye!");
+                return Ok(());
             }
+
+            // Reconcile any stale state before acting
+            self.reconcile_state().await.ok();
 
             // Display status
             self.display_status().await?;
@@ -480,12 +503,22 @@ impl FundingBot {
                 }
             }
 
-            // Wait for next monitoring cycle
+            // Wait for next monitoring cycle (interruptible by Ctrl+C)
             info!("{} {} {}",
                 "😴 Sleeping for",
                 MONITORING_INTERVAL_MINUTES,
                 "minutes...");
-            sleep(Duration::from_secs(MONITORING_INTERVAL_MINUTES * 60)).await;
+            let wait = sleep(Duration::from_secs(MONITORING_INTERVAL_MINUTES * 60));
+            tokio::pin!(wait);
+            tokio::select! {
+                _ = &mut wait => {},
+                _ = tokio::signal::ctrl_c() => {
+                    info!("{}", "");
+                    info!("{}", "🛑 Shutdown signal received during sleep. Stopping gracefully.");
+                    info!("{}", "ℹ️  Open positions (if any) will remain open.");
+                    return Ok(());
+                }
+            }
         }
     }
 }
