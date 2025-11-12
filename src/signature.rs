@@ -60,7 +60,14 @@ pub fn sign_order(
         .join("scripts")
         .join("sign_order.py");
 
-    let mut child = Command::new("python")
+    // Use python3 on Linux/Docker, python on Windows
+    let python_cmd = if cfg!(target_os = "windows") {
+        "python"
+    } else {
+        "python3"
+    };
+
+    let mut child = Command::new(python_cmd)
         .arg(&script_path)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
