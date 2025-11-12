@@ -659,12 +659,15 @@ impl RestClient {
         // This ensures our signed amounts match what the server recalculates
         let price = (raw_price * price_multiplier).round() / price_multiplier;
 
-        // 4. Calculate quantity from notional
-        //    If reduce_only and a max_base_size is provided, clamp to that size to avoid oversizing
-        let mut raw_quantity = notional_usd / price;
-        if let Some(max_base) = max_base_size {
-            raw_quantity = raw_quantity.min(max_base);
-        }
+        // 4. Calculate quantity
+        //    For reduce-only closes, derive quantity directly from the current
+        //    base position size to avoid dust from price/notional rounding.
+        //    Otherwise, compute from notional and price.
+        let mut raw_quantity = if reduce_only {
+            if let Some(max_base) = max_base_size { max_base } else { notional_usd / price }
+        } else {
+            notional_usd / price
+        };
 
         // Get trading config constraints
         let min_size: f64 = market_config.trading_config.min_order_size.parse()
