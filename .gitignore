@@ -1,0 +1,38 @@
+# Rust
+/target/
+**/*.rs.bk
+*.pdb
+Cargo.lock
+
+# Environment & Keys
+.env
+.env.*
+*_keys.*
+*secret*
+*private*
+*.pem
+*.key
+
+# Bot State (may contain sensitive data)
+bot_state.json
+
+# Claude Code
+.claude/
+CLAUDE.md
+
+# Archives
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
