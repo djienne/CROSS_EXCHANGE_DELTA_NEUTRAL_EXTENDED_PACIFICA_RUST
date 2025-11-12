@@ -662,11 +662,12 @@ impl RestClient {
         // 4. Calculate quantity
         //    For reduce-only closes, derive quantity directly from the current
         //    base position size to avoid dust from price/notional rounding.
-        //    Otherwise, compute from notional and price.
+        //    For normal opens, if a desired base size is provided, use it directly
+        //    so Extended matches the targeted base size precisely.
         let mut raw_quantity = if reduce_only {
             if let Some(max_base) = max_base_size { max_base } else { notional_usd / price }
         } else {
-            notional_usd / price
+            if let Some(desired_base) = max_base_size { desired_base } else { notional_usd / price }
         };
 
         // Get trading config constraints

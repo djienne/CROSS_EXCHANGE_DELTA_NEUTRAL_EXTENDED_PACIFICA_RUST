@@ -144,7 +144,7 @@ pub fn calculate_signed_amounts(
     let collateral_value = quantity * price;
     let fee_value = collateral_value * fee_rate;
 
-    // Scale to stark amounts with proper rounding
+    // Scale to stark amounts
     let base_amount_scaled = quantity * synthetic_resolution as f64;
     let quote_amount_scaled = collateral_value * collateral_resolution as f64;
 
@@ -153,20 +153,36 @@ pub fn calculate_signed_amounts(
         base_amount_scaled, quote_amount_scaled
     );
 
-    // Apply rounding based on order side (matching Python SDK)
-    let (base_amount_abs, quote_amount_abs) = match side {
-        OrderSide::Buy => {
-            // BUY: Round UP both base and quote
-            (base_amount_scaled.ceil() as i128, quote_amount_scaled.ceil() as i128)
-        }
-        OrderSide::Sell => {
-            // SELL: Round DOWN base, Round UP quote (to match Extended's calculation)
-            (base_amount_scaled.floor() as i128, quote_amount_scaled.ceil() as i128)
+    // Helper: snap very-near-integers to exact to avoid +1 due to FP epsilon
+    fn snap_to_int(x: f64) -> Option<i128> {
+        let r = x.round();
+        if (x - r).abs() <= 1e-6 { Some(r as i128) } else { None }
+    }
+
+    // Apply rounding based on order side (matching Python SDK),
+    // but first snap values that are effectively integers.
+    let base_amount_abs: i128 = if let Some(v) = snap_to_int(base_amount_scaled) {
+        v
+    } else {
+        match side {
+            OrderSide::Buy => base_amount_scaled.ceil() as i128,
+            OrderSide::Sell => base_amount_scaled.floor() as i128,
         }
     };
 
-    // Fee always rounds UP
-    let fee_amount = (fee_value * collateral_resolution as f64).ceil() as u128;
+    let quote_amount_abs: i128 = if let Some(v) = snap_to_int(quote_amount_scaled) {
+        v
+    } else {
+        match side {
+            // Extended expects quote to be rounded up for both sides
+            OrderSide::Buy => quote_amount_scaled.ceil() as i128,
+            OrderSide::Sell => quote_amount_scaled.ceil() as i128,
+        }
+    };
+
+    // Fee always rounds UP, but snap near-integer first
+    let fee_scaled = fee_value * collateral_resolution as f64;
+    let fee_amount = if let Some(v) = snap_to_int(fee_scaled) { v as u128 } else { fee_scaled.ceil() as u128 };
 
     // Apply signs based on side
     let (base_amount, quote_amount) = match side {
