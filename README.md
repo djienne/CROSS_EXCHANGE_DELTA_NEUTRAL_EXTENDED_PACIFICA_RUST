@@ -31,6 +31,67 @@ Before installation, ensure you have:
 
 ---
 
+## 🐳 Docker Quick Start
+
+**The fastest way to get started!** Using Docker, you can run the bot without installing Rust or Python dependencies locally.
+
+### Prerequisites
+- [Docker](https://docs.docker.com/get-docker/) installed on your system
+- Your `.env` file configured with API credentials (see Configuration section below)
+- Your `config.json` configured with trading parameters
+
+### Build the Docker Image
+
+```bash
+docker build -t funding-bot .
+```
+
+### Run the Bot
+
+```bash
+# Run with your credentials and config mounted
+docker run -d \
+  --name funding-bot \
+  --env-file .env \
+  -v $(pwd)/config.json:/app/config.json \
+  -v $(pwd)/bot_state.json:/app/data/bot_state.json \
+  funding-bot
+```
+
+**On Windows (PowerShell):**
+```powershell
+docker run -d `
+  --name funding-bot `
+  --env-file .env `
+  -v ${PWD}/config.json:/app/config.json `
+  -v ${PWD}/bot_state.json:/app/data/bot_state.json `
+  funding-bot
+```
+
+### Monitor the Bot
+
+```bash
+# View live logs
+docker logs -f funding-bot
+
+# Check bot status
+docker ps
+
+# Stop the bot
+docker stop funding-bot
+
+# Remove the container
+docker rm funding-bot
+```
+
+### Docker Notes
+- The bot runs as a non-root user (`botuser`) for security
+- State is persisted in `bot_state.json` (mount it to preserve state across restarts)
+- Health checks run every 30 seconds to ensure the bot is running
+- All Python dependencies are included in the image
+
+---
+
 ## 🤖 Autonomous Trading Bot
 
 The main feature is a **fully automated funding rate farming bot** that:
