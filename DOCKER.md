@@ -16,11 +16,13 @@ This guide covers running the Extended/Pacifica delta neutral trading bot using 
 docker-compose build
 ```
 
-This creates a multi-stage Docker image (~874MB) with:
-- Rust 1.91 runtime
-- Python 3.11 with starknet-py and cairo-lang
+This creates a multi-stage Docker image (~605MB) with:
+- Debian Bookworm base (runtime)
+- Rust 1.91 (build time only)
+- Python 3.11 with Extended DEX SDK (python_sdk-starknet)
 - Compiled trading bot binary
 - Order signing scripts
+- Non-root user for security
 
 ### 2. Start the Bot
 

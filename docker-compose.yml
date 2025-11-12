@@ -4,41 +4,29 @@ networks:
     ipam:
       config:
         - subnet: 172.8.68.0/22
+
 services:
   trading-bot:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: extended-pacifica-bot
+    container_name: extended_pacifica_bot
     restart: unless-stopped
 
-    # Environment variables (load from .env file)
+    # Environment variables from .env file
     env_file:
       - .env
 
-    environment:
-      - RUST_LOG=${RUST_LOG:-info}
-      - RUST_BACKTRACE=1
-
-    # Volume mounts for persistence and configuration
+    # Mount volumes for configuration and data persistence
     volumes:
-      # Mount config file (read-only recommended for production)
+      # Configuration file (read-only)
       - ./config.json:/app/config.json:ro
 
-      # Mount state file for persistence (read-write)
+      # State file for position tracking (read-write)
       - ./bot_state.json:/app/bot_state.json:rw
 
-      # Ensure state file is always external: container never relies on baked-in copies
-      # Edits to bot_state.json on the host are reflected immediately; no rebuild required
-
-      # Alternative: use named volume for state persistence
-      # - bot-data:/app/data
-
-      # Mount .env file explicitly (if not using env_file)
+      # Optional: Mount .env file explicitly (if not using env_file)
       # - ./.env:/app/.env:ro
-
-    # Network mode (host network for direct access, or bridge for isolation)
-    network_mode: bridge
 
     # Logging configuration
     logging:
@@ -47,7 +35,7 @@ services:
         max-size: "10m"
         max-file: "3"
 
-    # Resource limits (adjust based on your system)
+    # Resource limits (adjust based on your needs)
     deploy:
       resources:
         limits:
@@ -57,15 +45,19 @@ services:
           cpus: '0.5'
           memory: 256M
 
+    # Graceful shutdown (allow 30 seconds for position cleanup)
+    stop_grace_period: 30s
+
+    # Stop signal (SIGINT for graceful shutdown)
+    stop_signal: SIGINT
+
+    # Network mode
+    network_mode: bridge
+
     # Health check
     healthcheck:
       test: ["CMD", "pgrep", "-f", "extended_connector"]
-      interval: 5m
+      interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 30s
-
-# Optional: Named volumes for data persistence
-# volumes:
-#   bot-data:
-#     driver: local
+      start_period: 5s
