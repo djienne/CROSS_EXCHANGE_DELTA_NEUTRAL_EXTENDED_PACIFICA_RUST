@@ -327,14 +327,9 @@ cargo run --example check_cross_spreads
 ```bash
 # Emergency exit - closes ALL positions immediately
 cargo run --bin emergency_exit
-
-# Force rotation - triggers bot to close on next cycle
-cargo run --bin force_rotation
 ```
 
 **Emergency Exit**: Closes all open positions on both exchanges using the bot's proven close logic. Includes automatic retries and detailed status reporting. Use in case of market emergencies or when you need to exit all positions quickly.
-
-**Force Rotation**: Modifies `bot_state.json` to set rotation time 49 hours ago, causing the bot to close positions on its next monitoring cycle (within 15 minutes). Safer alternative if emergency_exit fails.
 
 ## Library Usage
 
@@ -441,8 +436,7 @@ src/
 ├── trading.rs             # Position execution logic
 ├── bot.rs                 # Bot orchestration & state
 ├── bin/                   # Standalone binaries
-│   ├── emergency_exit.rs  # Emergency position closer
-│   └── force_rotation.rs  # Force rotation trigger
+│   └── emergency_exit.rs  # Emergency position closer
 ├── snip12/                # SNIP-12 signing implementation
 └── pacifica/              # Pacifica exchange integration
     ├── client.rs          # Orderbook WebSocket

@@ -38,12 +38,9 @@ WHY THIS WORKS:
 ALTERNATIVES IF IT FAILS:
 --------------------------
 
-1. Force Rotation (triggers bot to close on next cycle):
-   cargo run --bin force_rotation
-
-2. Manual Web Interface:
-   - Extended: https://app.extended.exchange
-   - Pacifica: https://app.pacifica.fi
+Manual Web Interface:
+- Extended: https://app.extended.exchange
+- Pacifica: https://app.pacifica.fi
 
 
 PREREQUISITES:
