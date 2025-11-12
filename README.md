@@ -1,4 +1,4 @@
-# Extended DEX and Pacifica Funding Rate Farming Bot
+# Extended DEX and Pacifica Funding Rate Farming Bot (RUST)
 
 **An autonomous trading bot for delta neutral funding rate farming between Extended DEX (Starknet) and Pacifica, plus a comprehensive Rust connector library for both exchanges.**
 
