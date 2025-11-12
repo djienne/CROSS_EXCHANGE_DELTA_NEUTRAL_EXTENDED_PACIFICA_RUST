@@ -1,0 +1,62 @@
+services:
+  trading-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: extended-pacifica-bot
+    restart: unless-stopped
+
+    # Environment variables (load from .env file)
+    env_file:
+      - .env
+
+    environment:
+      - RUST_LOG=${RUST_LOG:-info}
+      - RUST_BACKTRACE=1
+
+    # Volume mounts for persistence and configuration
+    volumes:
+      # Mount config file (read-only recommended for production)
+      - ./config.json:/app/config.json:ro
+
+      # Mount state file for persistence (read-write)
+      - ./bot_state.json:/app/bot_state.json:rw
+
+      # Alternative: use named volume for state persistence
+      # - bot-data:/app/data
+
+      # Mount .env file explicitly (if not using env_file)
+      # - ./.env:/app/.env:ro
+
+    # Network mode (host network for direct access, or bridge for isolation)
+    network_mode: bridge
+
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # Resource limits (adjust based on your system)
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "extended_connector"]
+      interval: 5m
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+# Optional: Named volumes for data persistence
+# volumes:
+#   bot-data:
+#     driver: local
