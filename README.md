@@ -54,13 +54,13 @@ Regardless of whether ETH goes up or down, your positions offset each other whil
 * ✅ **Scalable** - Works with any position size (subject to liquidity)
 
 ### This Bot's Strategy
-This bot uses a **48-hour rotation cycle** with multiple objectives:
+This bot uses a **configurable rotation cycle** (default 48 hours) with multiple objectives:
 
 1. **Generate trading volume** - Regular position rotation creates volume across different assets, which can qualify for potential exchange airdrops and rewards programs
 2. **Capture funding spreads** - Earn funding rate differentials as a bonus while maintaining positions
 3. **Stay market neutral** - All positions are delta neutral, minimizing directional price risk
 
-The 48-hour cycle is intentionally short - not to maximize funding returns (which would require longer holding periods), but to generate consistent volume across multiple markets while staying hedged. This approach is ideal for:
+The default 48-hour cycle is intentionally short - not to maximize funding returns (which would require longer holding periods), but to generate consistent volume across multiple markets while staying hedged. You can adjust this hold time in the configuration based on your strategy. This approach is ideal for:
 - Farming potential airdrops through volume, position holding time and activity
 - Earning funding spreads as a secondary benefit
 
@@ -134,7 +134,7 @@ docker compose down
 The main feature is a **fully automated funding rate farming bot** that:
 - 🔍 Scans markets every 15 minutes for best opportunities
 - 💰 Opens delta neutral positions (95% of available capital)
-- ⏱️ Holds positions for 48 hours to capture funding payments
+- ⏱️ Holds positions for configurable duration (default 48 hours) to capture funding payments
 - 🔄 Automatically rotates to new opportunities
 - 💾 Persists state for crash recovery
 - 📊 Displays real-time PnL and position status
@@ -208,7 +208,8 @@ Edit `config.json` to set your risk parameters:
     "min_net_apr_pct": 5.0
   },
   "trading": {
-    "max_position_size_usd": 1000.0
+    "max_position_size_usd": 1000.0,
+    "hold_time_hours": 48
   }
 }
 ```
@@ -219,6 +220,7 @@ Edit `config.json` to set your risk parameters:
 - `max_cross_exchange_spread_pct`: Maximum price difference between exchanges (prevents arbitrage execution risk)
 - `min_net_apr_pct`: Minimum net APR after costs (higher = fewer but more profitable opportunities)
 - `max_position_size_usd`: Cap on position size per exchange (risk management)
+- `hold_time_hours`: Time to hold positions before rotation (default: 48 hours; range: 1-720 hours)
 
 ### 5. Build and Run
 
@@ -320,7 +322,7 @@ tokio = { version = "1.42", features = ["full"] }
 ### Bot Behavior
 
 - **Monitoring Interval**: 15 minutes
-- **Position Hold Time**: 48 hours
+- **Position Hold Time**: Configurable in config.json (default: 48 hours)
 - **Capital Allocation**: 95% of minimum available
 - **Retry Attempts**: 5 with exponential backoff
 - **Order Type**: Market orders for reliable execution
