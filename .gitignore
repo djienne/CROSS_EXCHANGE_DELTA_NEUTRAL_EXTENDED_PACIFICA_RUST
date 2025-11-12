@@ -7,6 +7,7 @@ Cargo.lock
 # Environment & Keys
 .env
 .env.*
+!.env.example
 *_keys.*
 *secret*
 *private*
