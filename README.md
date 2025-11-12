@@ -42,15 +42,17 @@ Before installation, ensure you have:
 
 ### Option 1: Docker Compose (Recommended)
 
-**Build and run with a single command:**
+**Build and start the bot:**
 
 ```bash
-# Build the image
+# Build the Docker image
 docker compose build
 
-# Start the bot in background
+# Start the bot in background (persistent mode with -d flag)
 docker compose up -d
 ```
+
+The `-d` flag runs the container in detached mode (background), allowing it to run persistently.
 
 **Manage the bot:**
 
