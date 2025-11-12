@@ -159,6 +159,7 @@ pub async fn open_delta_neutral_position(
         stark_public_key,
         vault_id,
         false, // reduce_only = false (opening position)
+        None,
     ).await?;
 
     info!("Extended order placed: {:?}", extended_order);

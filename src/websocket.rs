@@ -72,11 +72,16 @@ impl WebSocketClient {
     async fn connect_and_stream(&self, url: String) -> Result<mpsc::UnboundedReceiver<BidAsk>> {
         info!("Connecting to WebSocket: {}", url);
 
-        // Build request with User-Agent header
+        // Build request with headers
         let mut request = url.into_client_request()?;
         request
             .headers_mut()
             .insert("User-Agent", "extended-connector/0.1.0".parse().unwrap());
+        if let Some(ref api_key) = self.api_key {
+            if let Ok(hv) = api_key.parse() {
+                request.headers_mut().insert("X-Api-Key", hv);
+            }
+        }
 
         let (ws_stream, _) = connect_async(request).await?;
 
@@ -100,11 +105,16 @@ impl WebSocketClient {
     ) -> Result<mpsc::UnboundedReceiver<WsOrderBookMessage>> {
         info!("Connecting to WebSocket: {}", url);
 
-        // Build request with User-Agent header
+        // Build request with headers
         let mut request = url.into_client_request()?;
         request
             .headers_mut()
             .insert("User-Agent", "extended-connector/0.1.0".parse().unwrap());
+        if let Some(ref api_key) = self.api_key {
+            if let Ok(hv) = api_key.parse() {
+                request.headers_mut().insert("X-Api-Key", hv);
+            }
+        }
 
         let (ws_stream, _) = connect_async(request).await?;
 
@@ -214,14 +224,14 @@ impl WebSocketClient {
 /// Helper to manage multiple market subscriptions
 pub struct MultiMarketSubscriber {
     client: WebSocketClient,
-    subscriptions: HashMap<String, mpsc::UnboundedReceiver<BidAsk>>,
+    _subscriptions: HashMap<String, mpsc::UnboundedReceiver<BidAsk>>,
 }
 
 impl MultiMarketSubscriber {
     pub fn new(client: WebSocketClient) -> Self {
         Self {
             client,
-            subscriptions: HashMap::new(),
+            _subscriptions: HashMap::new(),
         }
     }
 
