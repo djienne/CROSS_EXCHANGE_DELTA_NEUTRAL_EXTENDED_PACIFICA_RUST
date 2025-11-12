@@ -40,7 +40,7 @@ Before installation, ensure you have:
 - Your `.env` file configured with API credentials (see Configuration section below)
 - Your `config.json` configured with trading parameters
 
-### Option 1: Docker Compose (Recommended)
+### Using Docker Compose
 
 **Build and start the bot:**
 
@@ -68,52 +68,6 @@ docker compose stop
 
 # Stop and remove containers
 docker compose down
-```
-
-### Option 2: Standard Docker Commands
-
-**Build the Docker Image:**
-
-```bash
-docker build -t funding-bot .
-```
-
-**Run the Bot:**
-
-```bash
-# Run with your credentials and config mounted
-docker run -d \
-  --name funding-bot \
-  --env-file .env \
-  -v $(pwd)/config.json:/app/config.json \
-  -v $(pwd)/bot_state.json:/app/data/bot_state.json \
-  funding-bot
-```
-
-**On Windows (PowerShell):**
-```powershell
-docker run -d `
-  --name funding-bot `
-  --env-file .env `
-  -v ${PWD}/config.json:/app/config.json `
-  -v ${PWD}/bot_state.json:/app/data/bot_state.json `
-  funding-bot
-```
-
-**Monitor the Bot:**
-
-```bash
-# View live logs
-docker logs -f funding-bot
-
-# Check bot status
-docker ps
-
-# Stop the bot
-docker stop funding-bot
-
-# Remove the container
-docker rm funding-bot
 ```
 
 ### Docker Notes
@@ -557,9 +511,6 @@ This file enables crash recovery - if the bot restarts, it loads the previous st
 ## Testing
 
 ```bash
-# Run all tests
-cargo test
-
 # Run bot in different terminal to monitor
 cargo run
 
