@@ -4,6 +4,16 @@
 
 **New to Extended DEX?** [Sign up with my referral link](https://app.extended.exchange/join/FREQTRADE) and receive a **10% discount on commissions** for your first $50M in total trading volume.
 
+**Pacifica**: Sign up at [app.pacifica.fi](https://app.pacifica.fi/) and use one of the following referral codes when registering (if one is already taken, try another):
+  ```
+  411J9J7CYNFZN3SX
+  2K7D40A9H53M2TJT
+  S1G3A2063Q7410BV
+  5KH0XDRD8BDGTBCT
+  S1YHDS2GWAJTWJ4M
+  7KB69JEC3BSA6GTR
+  ```
+
 ## 🤖 Autonomous Trading Bot
 
 The main feature is a **fully automated funding rate arbitrage bot** that:
