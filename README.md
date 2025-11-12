@@ -40,13 +40,43 @@ Before installation, ensure you have:
 - Your `.env` file configured with API credentials (see Configuration section below)
 - Your `config.json` configured with trading parameters
 
-### Build the Docker Image
+### Option 1: Docker Compose (Recommended)
+
+**Build and run with a single command:**
+
+```bash
+# Build the image
+docker compose build
+
+# Start the bot in background
+docker compose up -d
+```
+
+**Manage the bot:**
+
+```bash
+# View live logs
+docker compose logs -f
+
+# Check status
+docker compose ps
+
+# Stop the bot
+docker compose stop
+
+# Stop and remove containers
+docker compose down
+```
+
+### Option 2: Standard Docker Commands
+
+**Build the Docker Image:**
 
 ```bash
 docker build -t funding-bot .
 ```
 
-### Run the Bot
+**Run the Bot:**
 
 ```bash
 # Run with your credentials and config mounted
@@ -68,7 +98,7 @@ docker run -d `
   funding-bot
 ```
 
-### Monitor the Bot
+**Monitor the Bot:**
 
 ```bash
 # View live logs
