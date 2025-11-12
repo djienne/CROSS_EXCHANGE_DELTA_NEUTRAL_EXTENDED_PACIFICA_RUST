@@ -248,9 +248,14 @@ impl FundingBot {
             .map(|p| p.margin.parse::<f64>().unwrap_or(0.0))
             .sum();
 
-        // Estimate Pacifica available capital (this is approximate)
-        // In a real implementation, you'd want an actual account balance endpoint
-        let pacifica_free = extended_free; // Assume similar capital for now
+        // TODO: Pacifica API doesn't currently expose a direct account balance endpoint
+        // As a workaround, we assume similar capital on both exchanges
+        // LIMITATION: This may cause position sizing errors if balances differ significantly
+        // RECOMMENDED: Manually ensure both exchanges have similar free collateral
+        // FUTURE: Implement proper Pacifica balance fetching when API endpoint becomes available
+        let pacifica_free = extended_free; // Temporary: Assume similar capital
+
+        warn!("⚠️  Note: Pacifica balance is estimated (assumes same as Extended: ${:.2}). Ensure both exchanges have similar collateral.", pacifica_free);
 
         info!("{} {}", "💰 Extended free collateral:", format!("${:.2}", extended_free));
         info!("{} {}", "💰 Pacifica estimated free:", format!("${:.2}", pacifica_free));
@@ -361,8 +366,66 @@ impl FundingBot {
             "⏱️  Position hold time:",
             POSITION_HOLD_TIME_HOURS,
             "hours");
+        info!("{}", "🛑 Press Ctrl+C to stop gracefully");
+
+        // Setup graceful shutdown signal handler
+        let mut shutdown_signal = Box::pin(tokio::signal::ctrl_c());
 
         loop {
+            // Check for shutdown signal at the beginning of each iteration
+            tokio::select! {
+                result = &mut shutdown_signal => {
+                    match result {
+                        Ok(_) => {
+                            info!("{}", "");
+                            info!("{}", "🛑 Shutdown signal received. Stopping bot gracefully...");
+                            info!("{}", "⚠️  WARNING: The bot will stop, but WILL NOT automatically close positions.");
+                            info!("{}", "   You should manually close positions on the exchange dashboards if needed.");
+
+                            if self.state.current_position.is_some() {
+                                warn!("{}", "");
+                                warn!("{}", "⚠️  ACTIVE POSITION DETECTED!");
+                                warn!("{}", "   The bot has an active position. Shutdown options:");
+                                warn!("{}", "   1. Press Ctrl+C again to force quit immediately");
+                                warn!("{}", "   2. Wait 10 seconds to attempt graceful position close");
+                                warn!("{}", "");
+                                warn!("{}", "⏳ Waiting 10 seconds before attempting to close positions...");
+
+                                // Give user 10 seconds to force quit or let it close
+                                match tokio::time::timeout(
+                                    Duration::from_secs(10),
+                                    tokio::signal::ctrl_c()
+                                ).await {
+                                    Ok(_) => {
+                                        error!("{}", "⚠️  Force quit requested. Exiting immediately without closing positions.");
+                                        return Ok(());
+                                    }
+                                    Err(_) => {
+                                        info!("{}", "⏳ Attempting to close positions gracefully...");
+                                        if let Err(e) = self.close_current_position().await {
+                                            error!("{} {}", "❌ Failed to close position during shutdown:", e);
+                                            error!("{}", "   Please manually close positions on exchange dashboards!");
+                                        } else {
+                                            info!("{}", "✅ Positions closed successfully.");
+                                        }
+                                    }
+                                }
+                            }
+
+                            info!("{}", "👋 Bot stopped. Goodbye!");
+                            return Ok(());
+                        }
+                        Err(e) => {
+                            error!("Error setting up Ctrl+C handler: {}", e);
+                            return Err(Box::new(e) as Box<dyn std::error::Error>);
+                        }
+                    }
+                }
+                _ = async {} => {
+                    // Continue with normal bot operations
+                }
+            }
+
             // Display status
             self.display_status().await?;
 

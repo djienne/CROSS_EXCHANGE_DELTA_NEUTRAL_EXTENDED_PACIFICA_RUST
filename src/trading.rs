@@ -328,6 +328,7 @@ mod tests {
         let extended_lot = 0.001;
         let pacifica_lot = 0.01;
         let price = 50000.0;
+        let max_position_size = 1000.0;
 
         let size = calculate_position_size(
             extended_capital,
@@ -335,13 +336,15 @@ mod tests {
             extended_lot,
             pacifica_lot,
             price,
+            max_position_size,
         );
 
-        // Min capital = 10000, 95% = 9500
-        // Base size = 9500 / 50000 = 0.19
+        // Min capital = 10000, 95% = 9500, capped at 1000
+        // Target = min(9500, 1000) = 1000
+        // Base size = 1000 / 50000 = 0.02
         // Coarser lot = 0.01
-        // Rounded = 0.19
-        assert_eq!(size, 0.19);
+        // Rounded = 0.02
+        assert_eq!(size, 0.02);
     }
 
     #[test]
@@ -351,6 +354,7 @@ mod tests {
         let extended_lot = 0.001;
         let pacifica_lot = 0.01;
         let price = 50000.0;
+        let max_position_size = 10000.0; // High cap, won't affect result
 
         let size = calculate_position_size(
             extended_capital,
@@ -358,6 +362,7 @@ mod tests {
             extended_lot,
             pacifica_lot,
             price,
+            max_position_size,
         );
 
         // 95% of 10000 = 9500
@@ -374,6 +379,7 @@ mod tests {
         let extended_lot = 0.01;
         let pacifica_lot = 0.01;
         let price = 50000.0;
+        let max_position_size = 1000.0;
 
         let size = calculate_position_size(
             extended_capital,
@@ -381,6 +387,7 @@ mod tests {
             extended_lot,
             pacifica_lot,
             price,
+            max_position_size,
         );
 
         // 95% of 100 = 95
@@ -388,5 +395,32 @@ mod tests {
         // Coarser lot = 0.01
         // Rounded down = 0.0 (insufficient for one lot)
         assert_eq!(size, 0.0);
+    }
+
+    #[test]
+    fn test_calculate_position_size_capped_by_max() {
+        // Test that max_position_size_usd caps the position
+        let extended_capital = 100000.0; // $100k available
+        let pacifica_capital = 100000.0;
+        let extended_lot = 0.001;
+        let pacifica_lot = 0.001;
+        let price = 50000.0; // $50k per unit
+        let max_position_size = 1000.0; // Cap at $1k
+
+        let size = calculate_position_size(
+            extended_capital,
+            pacifica_capital,
+            extended_lot,
+            pacifica_lot,
+            price,
+            max_position_size,
+        );
+
+        // 95% of 100k = 95k, but capped at 1k
+        // Target notional = 1000
+        // Base size = 1000 / 50000 = 0.02
+        // Lot size = 0.001
+        // Rounded = 0.02
+        assert_eq!(size, 0.02);
     }
 }
