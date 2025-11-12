@@ -9,7 +9,7 @@
 **Extended DEX** - [Sign up here](https://app.extended.exchange/join/FREQTRADE)
 - 10% commission discount on first $50M volume
 
-**Pacifica** - [Sign up here](https://app.pacifica.fi/) with referral codes:
+**Pacifica** - [Sign up here](https://app.pacifica.fi/) with referral codes (try the next one if a code is already used):
 ```
 411J9J7CYNFZN3SX  2K7D40A9H53M2TJT  S1G3A2063Q7410BV
 5KH0XDRD8BDGTBCT  S1YHDS2GWAJTWJ4M  7KB69JEC3BSA6GTR
