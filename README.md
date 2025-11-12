@@ -61,7 +61,7 @@ This bot uses a **48-hour rotation cycle** with multiple objectives:
 3. **Stay market neutral** - All positions are delta neutral, minimizing directional price risk
 
 The 48-hour cycle is intentionally short - not to maximize funding returns (which would require longer holding periods), but to generate consistent volume across multiple markets while staying hedged. This approach is ideal for:
-- Farming potential airdrops through volume and activity
+- Farming potential airdrops through volume, position holding time and activity
 - Earning funding spreads as a secondary benefit
 
 ---
