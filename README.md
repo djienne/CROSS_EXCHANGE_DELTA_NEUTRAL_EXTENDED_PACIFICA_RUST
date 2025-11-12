@@ -27,9 +27,9 @@
 
 ### The Concept
 
-Perpetual futures contracts use **funding rates** to keep their prices anchored to spot prices. Every 8 hours, depending on market sentiment:
-- When longs outnumber shorts → longs **pay** shorts (negative funding)
-- When shorts outnumber longs → shorts **pay** longs (positive funding)
+Perpetual futures contracts use **funding rates** to keep their prices anchored to spot prices. Typically every 1 to 8 hours, depending on market sentiment:
+- When longs outnumber shorts → longs **pay** shorts (positive funding)
+- When shorts outnumber longs → shorts **pay** longs (negative funding)
 
 Different exchanges often have different funding rates for the same asset. This creates an arbitrage opportunity.
 
