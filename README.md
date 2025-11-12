@@ -35,7 +35,7 @@ Different exchanges often have different funding rates for the same asset. This 
 
 ### How It Works
 1. **Identify the spread** - Find two exchanges where one pays significantly more than the other
-2. **Open opposite positions** - Go LONG on the exchange with positive funding, SHORT on the exchange with negative funding
+2. **Open opposite positions** - Go SHORT on the exchange with positive funding, LONG on the exchange with negative funding
 3. **Stay market neutral** - Because you're both long and short on the same asset, price movements cancel out
 4. **Collect the difference** - Every 8 hours, you receive funding on one side and pay on the other, pocketing the spread
 
