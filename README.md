@@ -4,26 +4,6 @@
 
 ---
 
-## ⚠️ IMPORTANT SECURITY & RISK WARNINGS
-
-**READ THIS BEFORE USING:**
-
-- 🔴 **FINANCIAL RISK**: Trading cryptocurrency involves substantial risk of loss. Only use funds you can afford to lose.
-- 🔴 **NO GUARANTEES**: Past performance does not guarantee future results. The bot can lose money.
-- 🔴 **ALPHA SOFTWARE**: This is experimental software. Bugs may exist that could result in financial loss.
-- 🔴 **API KEY SECURITY**: Never share your API keys or private keys. Store credentials securely.
-- 🔴 **START SMALL**: Always test with minimal amounts first (e.g., $10-50) before scaling up.
-- 🔴 **ACTIVE MONITORING**: Do not run unattended with significant capital. Monitor regularly.
-- 🔴 **YOUR RESPONSIBILITY**: You are solely responsible for any financial losses incurred.
-
-**RECOMMENDED APPROACH:**
-1. Test on testnet first (if available)
-2. Start with $10-50 on mainnet
-3. Monitor actively for 1-2 weeks
-4. Gradually increase position sizes only after confidence is established
-
----
-
 ## Prerequisites
 
 Before installation, ensure you have:
@@ -639,6 +619,27 @@ MIT
 ## Contributing
 
 Contributions welcome! Please open an issue or PR.
+
+---
+
+## ⚠️ IMPORTANT SECURITY & RISK WARNINGS
+
+**READ THIS BEFORE USING:**
+
+- 🔴 **FINANCIAL RISK**: Trading cryptocurrency involves substantial risk of loss. Only use funds you can afford to lose.
+- 🔴 **NO GUARANTEES**: Past performance does not guarantee future results. The bot can lose money.
+- 🔴 **ALPHA SOFTWARE**: This is experimental software. Bugs may exist that could result in financial loss.
+- 🔴 **API KEY SECURITY**: Never share your API keys or private keys. Store credentials securely.
+- 🔴 **START SMALL**: Always test with minimal amounts first (e.g., $10-50) before scaling up.
+- 🔴 **ACTIVE MONITORING**: Do not run unattended with significant capital. Monitor regularly.
+- 🔴 **YOUR RESPONSIBILITY**: You are solely responsible for any financial losses incurred.
+
+**RECOMMENDED APPROACH:**
+1. Start with $10-50
+2. Monitor actively for 1-2 weeks
+3. Gradually increase position sizes only after confidence is established
+
+---
 
 ## Disclaimer
 
