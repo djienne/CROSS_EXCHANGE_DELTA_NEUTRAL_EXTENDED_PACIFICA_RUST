@@ -21,7 +21,7 @@
 
 Before installation, ensure you have:
 
-- **Rust 1.70+** - [Install Rust](https://rustup.rs/)
+- **Rust 1.91+** - [Install Rust](https://rustup.rs/)
 - **Python 3.8+** - Required for order signing
 - **pip** - Python package manager
 - **Extended DEX Account** - Create using referral link above

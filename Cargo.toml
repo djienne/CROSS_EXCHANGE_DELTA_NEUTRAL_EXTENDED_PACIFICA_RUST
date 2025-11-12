@@ -2,6 +2,7 @@
 name = "extended_connector"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.91"
 
 [dependencies]
 tokio = { version = "1.42", features = ["full"] }
