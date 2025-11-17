@@ -436,13 +436,15 @@ async fn fetch_opportunity_data(
     let cross_spread = ((pac_mid - ext_mid).abs() / ext_mid) * 100.0;
 
     // Fetch funding rates
+    // Extended funding rates are HOURLY (applied once per hour)
+    // Use raw decimal rate, multiply by periods per year, then convert to percentage
     let ext_funding_apr = match extended_client.get_funding_rate(&extended_market).await {
-        Ok(Some(fr)) => fr.rate_percentage * 3.0 * 365.0,
+        Ok(Some(fr)) => fr.rate * 24.0 * 365.0 * 100.0,  // rate is decimal, convert to %
         _ => 0.0,
     };
 
     let pac_funding_apr = match pacifica_client.get_funding_rate(&symbol).await {
-        Ok(fr) => fr.rate_percentage * 24.0 * 365.0,
+        Ok(fr) => fr.next_rate_percentage * 24.0 * 365.0,  // Use next/projected rate (not historical)
         Err(_) => 0.0,
     };
 

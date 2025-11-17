@@ -187,7 +187,7 @@ impl FundingRateInfo {
     }
 
     /// Calculate APR (Annual Percentage Rate)
-    /// Funding rates are hourly values
+    /// Extended funding rates are HOURLY (applied once per hour per the API docs)
     /// APR = funding_rate * 24 * 365 = funding_rate * 8760
     pub fn calculate_apr(&self) -> f64 {
         self.rate * 24.0 * 365.0

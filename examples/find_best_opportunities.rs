@@ -266,8 +266,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let extended_funding_rate_apr = if let Some(ref client) = extended_client {
             match client.get_funding_rate(&extended_market).await {
                 Ok(Some(funding_info)) => {
-                    // rate_percentage is already in %, settled every 8 hours (3 times/day)
-                    funding_info.rate_percentage * 3.0 * 365.0
+                    // Extended funding rates are HOURLY (applied once per hour)
+                    // Use raw decimal rate, multiply by periods per year, then convert to percentage
+                    funding_info.rate * 24.0 * 365.0 * 100.0  // rate is decimal, convert to %
                 }
                 _ => 0.0,
             }
@@ -279,8 +280,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let pacifica_funding_rate_apr = if let Some(ref mut client) = pacifica_client {
             match client.get_funding_rate(symbol).await {
                 Ok(funding_rate) => {
-                    // rate_percentage is in %, settled hourly (24 times/day)
-                    funding_rate.rate_percentage * 24.0 * 365.0
+                    // Use next/projected rate (not historical), settled hourly (24 times/day)
+                    funding_rate.next_rate_percentage * 24.0 * 365.0
                 }
                 Err(_) => 0.0,
             }

@@ -178,17 +178,11 @@ impl RestClient {
         }
     }
 
-    /// Get latest funding rate for a specific market
+    /// Get latest funding rate for a specific market from market stats endpoint
+    /// The fundingRate field represents the current hourly funding rate
     pub async fn get_funding_rate(&self, market: &str) -> Result<Option<FundingRateInfo>> {
-        // Get funding rate for the last hour
-        let now = chrono::Utc::now().timestamp_millis() as u64;
-        let one_hour_ago = now - (3600 * 1000);
-
-        let url = format!(
-            "{}/info/{}/funding?startTime={}&endTime={}&limit=1",
-            self.base_url, market, one_hour_ago, now
-        );
-        debug!("Fetching funding rate for {} from {}", market, url);
+        let url = format!("{}/info/markets/{}/stats", self.base_url, market);
+        debug!("Fetching market stats for {} from {}", market, url);
 
         let mut request = self.client.get(&url);
 
@@ -204,20 +198,45 @@ impl RestClient {
                 .text()
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
-            warn!("Could not fetch funding rate for {}: {} - {}", market, status, error_text);
+            warn!("Could not fetch market stats for {}: {} - {}", market, status, error_text);
             return Ok(None);
         }
 
-        let api_response: PaginatedResponse<FundingRateData> = response.json().await?;
+        #[derive(serde::Deserialize)]
+        struct MarketStatsResponse {
+            status: String,
+            data: Option<MarketStatsData>,
+        }
+
+        #[derive(serde::Deserialize)]
+        #[allow(dead_code)]
+        struct MarketStatsData {
+            #[serde(rename = "fundingRate")]
+            funding_rate: String,
+        }
+
+        let api_response: MarketStatsResponse = response.json().await?;
 
         match api_response.data {
-            Some(data) if !data.is_empty() => {
-                let info = FundingRateInfo::from_data(data[0].clone());
-                debug!("Fetched funding rate for {}: {}", market, info.rate_percentage);
+            Some(data) => {
+                let rate: f64 = data.funding_rate.parse().unwrap_or(0.0);
+                let rate_percentage = rate * 100.0;
+                let is_positive = rate >= 0.0;
+                let now = chrono::Utc::now().timestamp_millis() as u64;
+
+                let info = FundingRateInfo {
+                    market: market.to_string(),
+                    rate,
+                    rate_percentage,
+                    timestamp: now,
+                    is_positive,
+                };
+
+                debug!("Fetched funding rate for {} from stats: {}", market, info.rate_percentage);
                 Ok(Some(info))
             }
-            _ => {
-                debug!("No funding rate data available for {}", market);
+            None => {
+                debug!("No market stats data available for {}", market);
                 Ok(None)
             }
         }

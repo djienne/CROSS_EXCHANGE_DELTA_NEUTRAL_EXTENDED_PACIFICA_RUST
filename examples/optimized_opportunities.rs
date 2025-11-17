@@ -286,13 +286,15 @@ async fn fetch_market_data(
     let total_volume_24h = extended_volume_24h + pacifica_volume_24h;
 
     // Fetch funding rates
+    // Extended funding rates are HOURLY (applied once per hour)
+    // Use raw decimal rate, multiply by periods per year, then convert to percentage
     let extended_funding_rate_apr = match extended_client.get_funding_rate(&extended_market).await {
-        Ok(Some(funding_info)) => funding_info.rate_percentage * 3.0 * 365.0,
+        Ok(Some(funding_info)) => funding_info.rate * 24.0 * 365.0 * 100.0,  // rate is decimal, convert to %
         _ => 0.0,
     };
 
     let pacifica_funding_rate_apr = match pacifica_client.get_funding_rate(&symbol).await {
-        Ok(funding_rate) => funding_rate.rate_percentage * 24.0 * 365.0,
+        Ok(funding_rate) => funding_rate.next_rate_percentage * 24.0 * 365.0,  // Use next/projected rate (not historical)
         Err(_) => 0.0,
     };
 
