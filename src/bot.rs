@@ -349,6 +349,25 @@ impl FundingBot {
             best.symbol,
             format!("${:.2}", position_size * current_price));
 
+        // Set leverage to 1x on both exchanges before opening position
+        info!("{}", "⚙️  Setting leverage to 1x on both exchanges...");
+
+        // Set Extended leverage to 1x
+        match self.extended_client.update_leverage(&extended_market, "1").await {
+            Ok(_) => info!("   ✅ Extended leverage set to 1x for {}", extended_market),
+            Err(e) => {
+                warn!("   ⚠️  Failed to set Extended leverage (continuing anyway): {}", e);
+            }
+        }
+
+        // Set Pacifica leverage to 1x
+        match self.pacifica_client.update_leverage(&pacifica_market, 1).await {
+            Ok(_) => info!("   ✅ Pacifica leverage set to 1x for {}", pacifica_market),
+            Err(e) => {
+                warn!("   ⚠️  Failed to set Pacifica leverage (continuing anyway): {}", e);
+            }
+        }
+
         // Open delta neutral position
         let position = open_delta_neutral_position(
             &best.symbol,
