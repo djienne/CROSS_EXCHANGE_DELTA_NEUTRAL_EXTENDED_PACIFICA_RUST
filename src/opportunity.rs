@@ -283,7 +283,8 @@ impl ScanResult {
                         ("Cross spread", format!("{:.2}%", opp.cross_spread_pct))
                     },
                     FilterResult::FailedApr => {
-                        ("APR too low", format!("{:.1}%", opp.best_net_apr))
+                        ("APR too low", format!("E:{:.1}% P:{:.1}%",
+                            opp.extended_funding_rate_apr, opp.pacifica_funding_rate_apr))
                     },
                     FilterResult::Passed => continue,
                 };
