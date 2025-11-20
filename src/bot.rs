@@ -136,6 +136,9 @@ impl FundingBot {
     /// If saved state indicates an active position but neither exchange has it,
     /// clear the state to avoid erroneous closes/rotations. If only one leg exists,
     /// keep that leg in state so a subsequent close will only act on the live leg.
+    ///
+    /// Returns Ok(()) if reconciliation was successful (or state was empty).
+    /// Returns Err if network/API calls failed - in this case state is NOT modified.
     pub async fn reconcile_state(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let Some(saved_pos) = self.state.current_position.clone() else {
             // Nothing to reconcile
@@ -145,25 +148,23 @@ impl FundingBot {
         let symbol = saved_pos.symbol.clone();
         let extended_market = format!("{}-USD", symbol);
 
-        // Query live positions on Extended (ignore errors to avoid false clearing)
-        let live_ext: Option<crate::types::Position> = match self
-            .extended_client
-            .get_positions(Some(&extended_market))
-            .await
-        {
-            Ok(list) => list.into_iter().find(|p| p.market == extended_market),
+        // Query live positions on Extended
+        // We propagate errors here so we don't accidentally clear state on network failure
+        let live_ext_list = match self.extended_client.get_positions(Some(&extended_market)).await {
+            Ok(list) => list,
             Err(e) => {
-                warn!("Skipping Extended reconciliation (could not fetch positions): {}", e);
-                None
+                warn!("Network error checking Extended positions: {}. Keeping existing state.", e);
+                return Err(e.into());
             }
         };
+        let live_ext = live_ext_list.into_iter().find(|p| p.market == extended_market);
 
         // Query live position on Pacifica
-        let live_pac: Option<PacificaPosition> = match self.pacifica_client.get_position(&symbol).await {
+        let live_pac = match self.pacifica_client.get_position(&symbol).await {
             Ok(pos_opt) => pos_opt,
             Err(e) => {
-                warn!("Skipping Pacifica reconciliation (could not fetch positions): {}", e);
-                None
+                warn!("Network error checking Pacifica positions: {}. Keeping existing state.", e);
+                return Err(e.into());
             }
         };
 

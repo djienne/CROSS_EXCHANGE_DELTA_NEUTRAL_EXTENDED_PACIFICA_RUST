@@ -6,8 +6,8 @@
     "min_net_apr_pct": 5.0
   },
   "trading": {
-    "max_position_size_usd": 940.0,
-    "hold_time_hours": 72
+    "max_position_size_usd": 800.0,
+    "hold_time_hours": 96
   },
   "display": {
     "max_opportunities_shown": 10,
