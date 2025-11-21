@@ -161,7 +161,6 @@ pub async fn open_delta_neutral_position(
         false, // reduce_only = false (opening position)
         Some(position_size_base), // pass desired base to match targeted size
     ).await?;
-
     info!("Extended order placed: {:?}", extended_order);
 
     // Step 2: Place second order with retry (Pacifica)
@@ -173,6 +172,8 @@ pub async fn open_delta_neutral_position(
 
     // Retry logic for Pacifica order (inline due to mutable reference)
     let mut pacifica_order = None;
+    let mut pacifica_error = None;
+
     for attempt in 1..=5 {
         match pacifica_client.place_market_order(
             pacifica_market_symbol,
@@ -191,16 +192,55 @@ pub async fn open_delta_neutral_position(
             Err(e) => {
                 if attempt >= 5 {
                     error!("Pacifica order failed after 5 attempts: {}", e);
-                    return Err(format!("Failed to place Pacifica order: {}", e).into());
+                    pacifica_error = Some(e);
+                } else {
+                    let delay_ms = 2u64.pow(attempt - 1) * 1000;
+                    warn!("Pacifica order failed (attempt {}/5): {}. Retrying in {}ms...", attempt, e, delay_ms);
+                    sleep(Duration::from_millis(delay_ms)).await;
                 }
-                let delay_ms = 2u64.pow(attempt - 1) * 1000;
-                warn!("Pacifica order failed (attempt {}/5): {}. Retrying in {}ms...", attempt, e, delay_ms);
-                sleep(Duration::from_millis(delay_ms)).await;
             }
         }
     }
 
-    let pacifica_order = pacifica_order.ok_or_else(|| "Pacifica order failed".to_string())?;
+    // Handle Pacifica failure: Rollback Extended position
+    let pacifica_order = match pacifica_order {
+        Some(order) => order,
+        None => {
+            let err_msg = pacifica_error.map(|e| e.to_string()).unwrap_or_else(|| "Unknown error".to_string());
+            error!("CRITICAL: Pacifica order failed. Initiating ROLLBACK of Extended position...");
+
+            // Rollback: Close Extended position
+            let close_side = if long_on_extended { OrderSide::Sell } else { OrderSide::Buy };
+            info!("ROLLBACK: Placing Extended order: {:?} {:.6} {} @ market", close_side, position_size_base, symbol);
+
+            // We use place_market_order directly for rollback to avoid needing a Position object
+            match extended_client.place_market_order(
+                extended_market_symbol,
+                close_side,
+                notional_usd, // Use same notional
+                stark_private_key,
+                stark_public_key,
+                vault_id,
+                true, // reduce_only = true
+                Some(position_size_base), // pass base size to ensure full close
+            ).await {
+                Ok(order) => {
+                    info!("ROLLBACK SUCCESSFUL: Extended position closed. Order: {:?}", order);
+                    return Err(Box::new(TradingError::new(
+                        format!("Pacifica order failed. Extended position successfully rolled back (closed). Original error: {}", err_msg),
+                        true
+                    )));
+                }
+                Err(e) => {
+                    error!("ROLLBACK FAILED: Failed to close Extended position! You may have a naked position! Error: {}", e);
+                    return Err(Box::new(TradingError::new(
+                        format!("Pacifica order failed AND rollback failed. CRITICAL: Check Extended position manually! Original error: {}. Rollback error: {}", err_msg, e),
+                        false // Not recoverable automatically, needs manual intervention
+                    )));
+                }
+            }
+        }
+    };
 
     info!("Pacifica order placed: {:?}", pacifica_order);
 

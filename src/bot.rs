@@ -435,6 +435,18 @@ impl FundingBot {
         Ok(())
     }
 
+    /// Check if the current position is imbalanced (only one leg active)
+    pub fn is_imbalanced(&self) -> bool {
+        if let Some(pos) = &self.state.current_position {
+            // Imbalanced if one is Some and the other is None
+            // (If both are None, reconcile_state sets current_position to None, so we wouldn't be here)
+            // (If both are Some, it's healthy)
+            pos.extended_position.is_some() ^ pos.pacifica_position.is_some()
+        } else {
+            false
+        }
+    }
+
     /// Main bot loop
     pub async fn run(&mut self, extended_api_key: Option<String>) -> Result<(), Box<dyn std::error::Error>> {
         info!("{}", "🚀 Starting Funding Rate Arbitrage Bot");
@@ -460,7 +472,28 @@ impl FundingBot {
             }
 
             // Reconcile any stale state before acting
-            self.reconcile_state().await.ok();
+            if let Err(e) = self.reconcile_state().await {
+                warn!("Network error during state reconciliation: {}. Skipping cycle to prevent unsafe actions.", e);
+                sleep(Duration::from_secs(60)).await; // Wait 1 minute before retrying
+                continue;
+            }
+
+            // CRITICAL: Check for imbalance immediately after reconciliation
+            if self.is_imbalanced() {
+                error!("{}", "⚠️  CRITICAL: Position imbalance detected! One leg is missing.");
+                info!("{}", "🚨 Initiating EMERGENCY CLOSE of remaining leg to preserve capital...");
+                
+                if let Err(e) = self.close_current_position().await {
+                    error!("{} {}", "❌ Failed to close imbalanced position:", e);
+                    info!("{}", "Will retry immediately...");
+                    // Don't sleep long if we are in a critical state
+                    sleep(Duration::from_secs(5)).await;
+                    continue;
+                } else {
+                    info!("{}", "✅ Emergency close successful. State is now clean.");
+                    // Continue to normal loop to potentially re-open if opportunity exists
+                }
+            }
 
             // Display status
             self.display_status().await?;
