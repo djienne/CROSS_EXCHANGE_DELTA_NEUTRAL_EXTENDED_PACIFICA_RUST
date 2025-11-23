@@ -19,6 +19,7 @@ url = "2.5"
 dotenv = "0.15"
 chrono = "0.4"
 prettytable-rs = "0.10"
+colored = "2.0"
 # Starknet cryptography for order signing
 starknet-crypto = "0.8"
 starknet-core = "0.16"

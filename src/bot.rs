@@ -13,6 +13,8 @@ use std::time::Duration;
 use tokio::time::sleep;
 use futures_util::FutureExt;
 use tracing::{info, warn, error};
+use prettytable::{Table, Row, Cell, format};
+use colored::*;
 
 const STATE_FILE: &str = "bot_state.json";
 const MONITORING_INTERVAL_MINUTES: u64 = 15;
@@ -190,10 +192,15 @@ impl FundingBot {
 
     /// Display current status summary
     pub async fn display_status(&self) -> Result<(), Box<dyn std::error::Error>> {
-        info!("╔═══════════════════════════════════════════════════════════════╗");
-        info!("║                  {}                      ║",
-            "FUNDING RATE BOT STATUS");
-        info!("╠═══════════════════════════════════════════════════════════════╣");
+        let mut table = Table::new();
+        table.set_format(*format::consts::FORMAT_BOX_CHARS);
+
+        // Title Row
+        table.set_titles(Row::new(vec![
+            Cell::new("FUNDING RATE BOT STATUS")
+                .style_spec("cb") // Center, Bold
+                .with_hspan(2)
+        ]));
 
         if let Some(pos) = &self.state.current_position {
             let hold_time_hours = self.config.trading.hold_time_hours;
@@ -210,27 +217,29 @@ impl FundingBot {
                 .map(|dt| dt.format("%Y-%m-%d %H:%M:%S UTC").to_string())
                 .unwrap_or_else(|| "Unknown".to_string());
 
-            let hours_formatted = format!("{:>37.1} hours", hours_remaining);
+            let hours_formatted = format!("{:.1} hours", hours_remaining);
 
-            info!("║ Symbol:              {:<43} ║", pos.symbol);
-            info!("║ Notional:            {:<43} ║", format!("${:.2}", pos.target_notional_usd));
-            info!("║ Opened:              {:<43} ║", opened_datetime);
-            info!("║ Rotation:            {:<43} ║", rotation_datetime);
-            info!("║ Time Remaining:      {:>43} ║", hours_formatted);
-            info!("║ Extended Position:   {:<42} ║",
-                if pos.extended_position.is_some() {
-                    "ACTIVE"
-                } else {
-                    "NONE"
-                }
-            );
-            info!("║ Pacifica Position:   {:<42} ║",
-                if pos.pacifica_position.is_some() {
-                    "ACTIVE"
-                } else {
-                    "NONE"
-                }
-            );
+            table.add_row(Row::new(vec![Cell::new("Symbol"), Cell::new(&pos.symbol).style_spec("b")]));
+            table.add_row(Row::new(vec![Cell::new("Notional"), Cell::new(&format!("${:.2}", pos.target_notional_usd))]));
+            table.add_row(Row::new(vec![Cell::new("Opened"), Cell::new(&opened_datetime)]));
+            table.add_row(Row::new(vec![Cell::new("Rotation"), Cell::new(&rotation_datetime)]));
+            table.add_row(Row::new(vec![Cell::new("Time Remaining"), Cell::new(&hours_formatted).style_spec(if hours_remaining < 1.0 { "Fr" } else { "Fg" })])); // Red if < 1h, else Green
+
+            // Extended Position Status
+            let ext_status = if pos.extended_position.is_some() {
+                "ACTIVE".green().bold()
+            } else {
+                "NONE".red().bold()
+            };
+            table.add_row(Row::new(vec![Cell::new("Extended Position"), Cell::new(&ext_status.to_string())]));
+
+            // Pacifica Position Status
+            let pac_status = if pos.pacifica_position.is_some() {
+                "ACTIVE".green().bold()
+            } else {
+                "NONE".red().bold()
+            };
+            table.add_row(Row::new(vec![Cell::new("Pacifica Position"), Cell::new(&pac_status.to_string())]));
 
             // Fetch current positions for PnL display
             if let Ok(extended_positions) = self.extended_client.get_positions(None).await {
@@ -240,8 +249,8 @@ impl FundingBot {
                         .unwrap_or(0.0);
 
                     let pnl_formatted = format!("${:.2}", pnl);
-
-                    info!("║ Extended PnL:        {:>43} ║", pnl_formatted);
+                    let style = if pnl >= 0.0 { "Fg" } else { "Fr" };
+                    table.add_row(Row::new(vec![Cell::new("Extended PnL"), Cell::new(&pnl_formatted).style_spec(style)]));
                 }
             }
 
@@ -249,17 +258,20 @@ impl FundingBot {
                 if let Some(pac_pos) = pacifica_positions.iter().find(|p| p.symbol == pos.symbol) {
                     let entry = pac_pos.entry();
                     let size = pac_pos.size();
-                    info!("║ Pacifica Entry:      {:<43} ║", format!("${:.2}", entry));
-                    info!("║ Pacifica Size:       {:>43} ║", format!("{:.6}", size));
+                    table.add_row(Row::new(vec![Cell::new("Pacifica Entry"), Cell::new(&format!("${:.2}", entry))]));
+                    table.add_row(Row::new(vec![Cell::new("Pacifica Size"), Cell::new(&format!("{:.6}", size))]));
                 }
             }
         } else {
-            info!("║ Status: {}                                    ║",
-                "NO ACTIVE POSITION");
+            table.add_row(Row::new(vec![
+                Cell::new("Status"),
+                Cell::new("NO ACTIVE POSITION").style_spec("Fy") // Yellow
+            ]));
         }
 
-        info!("║ Total Rotations:     {:>43} ║", self.state.total_rotations.to_string());
-        info!("╚═══════════════════════════════════════════════════════════════╝");
+        table.add_row(Row::new(vec![Cell::new("Total Rotations"), Cell::new(&self.state.total_rotations.to_string())]));
+
+        table.printstd();
 
         Ok(())
     }

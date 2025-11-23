@@ -5,6 +5,8 @@ use std::collections::HashSet;
 use std::fs;
 use tokio::task::JoinSet;
 use tracing::info;
+use prettytable::{Table, Row, Cell, format};
+use colored::*;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Config {
@@ -190,42 +192,62 @@ pub enum FilterResult {
 impl ScanResult {
     /// Display comprehensive scan summary table
     pub fn display_summary(&self, config: &FilterConfig) {
-        info!("╔════════════════════════════════════════════════════════════════════════════════╗");
-        info!("║                          {}                              ║",
-            "OPPORTUNITY SCAN SUMMARY");
-        info!("╠════════════════════════════════════════════════════════════════════════════════╣");
+        let mut table = Table::new();
+        table.set_format(*format::consts::FORMAT_BOX_CHARS);
 
-        // Filter statistics
-        info!("║ Markets Scanned:     {:>59} ║", self.stats.total_common_symbols.to_string());
-        info!("║ Passed All Filters:  {:>59} ║", self.stats.passed_filters.to_string());
-        info!("║ Filtered (Volume):   {:>59} ║", self.stats.filtered_by_volume.to_string());
-        info!("║ Filtered (Spread):   {:>59} ║", self.stats.filtered_by_spread.to_string());
-        info!("║ Filtered (APR):      {:>59} ║", self.stats.filtered_by_apr.to_string());
-        info!("╠════════════════════════════════════════════════════════════════════════════════╣");
+        // Title
+        table.set_titles(Row::new(vec![
+            Cell::new("OPPORTUNITY SCAN SUMMARY")
+                .style_spec("cb")
+                .with_hspan(2)
+        ]));
 
-        // Filter criteria
-        info!("║                             {}                                    ║",
-            "FILTER CRITERIA");
-        info!("╠════════════════════════════════════════════════════════════════════════════════╣");
-        info!("║ Min Volume:          {:>59} ║", format_volume(config.min_combined_volume_usd));
-        info!("║ Max Intra Spread:    {:>58}% ║", format!("{}", config.max_intra_exchange_spread_pct));
-        info!("║ Max Cross Spread:    {:>58}% ║", format!("{}", config.max_cross_exchange_spread_pct));
-        info!("║ Min Net APR:         {:>58}% ║", format!("{}", config.min_net_apr_pct));
+        // Filter Stats
+        table.add_row(Row::new(vec![Cell::new("Markets Scanned"), Cell::new(&self.stats.total_common_symbols.to_string())]));
+        table.add_row(Row::new(vec![Cell::new("Passed All Filters"), Cell::new(&self.stats.passed_filters.to_string()).style_spec("Fg")])); // Green
+        table.add_row(Row::new(vec![Cell::new("Filtered (Volume)"), Cell::new(&self.stats.filtered_by_volume.to_string())]));
+        table.add_row(Row::new(vec![Cell::new("Filtered (Spread)"), Cell::new(&self.stats.filtered_by_spread.to_string())]));
+        table.add_row(Row::new(vec![Cell::new("Filtered (APR)"), Cell::new(&self.stats.filtered_by_apr.to_string())]));
+
+        // Filter Criteria
+        table.add_row(Row::new(vec![
+            Cell::new("FILTER CRITERIA")
+                .style_spec("c")
+                .with_hspan(2)
+        ]));
+        table.add_row(Row::new(vec![Cell::new("Min Volume"), Cell::new(&format_volume(config.min_combined_volume_usd))]));
+        table.add_row(Row::new(vec![Cell::new("Max Intra Spread"), Cell::new(&format!("{}%", config.max_intra_exchange_spread_pct))]));
+        table.add_row(Row::new(vec![Cell::new("Max Cross Spread"), Cell::new(&format!("{}%", config.max_cross_exchange_spread_pct))]));
+        table.add_row(Row::new(vec![Cell::new("Min Net APR"), Cell::new(&format!("{}%", config.min_net_apr_pct))]));
+
+        table.printstd();
+        println!();
 
         if !self.opportunities.is_empty() {
-            info!("╠════════════════════════════════════════════════════════════════════════════════╣");
-            info!("║                        {}                          ║",
-                "OPPORTUNITIES (PASSED FILTERS)");
-            info!("╠════════════════════════════════════════════════════════════════════════════════╣");
-            info!("║ {} │ {}   │ {} │ {}           │ {} │ {} │ {}   ║",
-                "Sym", "Volume", "Net APR", "Strategy",
-                "Ext FR", "Pac FR", "Spreads");
-            info!("╠════════════════════════════════════════════════════════════════════════════════╣");
+            let mut opp_table = Table::new();
+            opp_table.set_format(*format::consts::FORMAT_BOX_CHARS);
+            
+            opp_table.set_titles(Row::new(vec![
+                Cell::new("OPPORTUNITIES (PASSED FILTERS)").style_spec("cb").with_hspan(7)
+            ]));
+            
+            opp_table.add_row(Row::new(vec![
+                Cell::new("Sym").style_spec("b"),
+                Cell::new("Volume").style_spec("b"),
+                Cell::new("Net APR").style_spec("b"),
+                Cell::new("Strategy").style_spec("b"),
+                Cell::new("Ext FR").style_spec("b"),
+                Cell::new("Pac FR").style_spec("b"),
+                Cell::new("Spreads").style_spec("b"),
+            ]));
 
             for opp in &self.opportunities {
-                let sym = format!("{:4}", truncate(&opp.symbol, 4));
-                let vol = format!("{:>8}", format_volume(opp.total_volume_24h));
-                let apr_formatted = format!("{:>6.1}%", opp.best_net_apr);
+                let sym = truncate(&opp.symbol, 4);
+                let vol = format_volume(opp.total_volume_24h);
+                let apr_formatted = format!("{:.1}%", opp.best_net_apr);
+                
+                // Color APR
+                let apr_style = if opp.best_net_apr >= 20.0 { "Fg" } else { "" }; // Green if > 20%
 
                 let strategy = if opp.best_direction.contains("Long Extended") {
                     "L.Ext/S.Pac"
@@ -233,28 +255,43 @@ impl ScanResult {
                     "L.Pac/S.Ext"
                 };
 
-                let ext_fr = format!("{:>5.1}%", opp.extended_funding_rate_apr);
-                let pac_fr = format!("{:>5.1}%", opp.pacifica_funding_rate_apr);
+                let ext_fr = format!("{:.1}%", opp.extended_funding_rate_apr);
+                let pac_fr = format!("{:.1}%", opp.pacifica_funding_rate_apr);
                 let spreads = format!("{:.2}/{:.2}/{:.2}",
                     opp.extended_spread_pct,
                     opp.pacifica_spread_pct,
                     opp.cross_spread_pct
                 );
 
-                info!("║ {} │ {} │ {} │ {:18} │ {} │ {} │ {:9} ║",
-                    sym, vol, apr_formatted, strategy, ext_fr, pac_fr, spreads);
+                opp_table.add_row(Row::new(vec![
+                    Cell::new(&sym),
+                    Cell::new(&vol),
+                    Cell::new(&apr_formatted).style_spec(apr_style),
+                    Cell::new(strategy),
+                    Cell::new(&ext_fr),
+                    Cell::new(&pac_fr),
+                    Cell::new(&spreads),
+                ]));
             }
+            opp_table.printstd();
+            println!();
         }
 
         if self.stats.filtered_by_volume + self.stats.filtered_by_spread + self.stats.filtered_by_apr > 0 {
-            info!("╠════════════════════════════════════════════════════════════════════════════════╣");
-            info!("║                      {}                           ║",
-                "FILTERED OUT (TOP 10 BY VOLUME)");
-            info!("╠════════════════════════════════════════════════════════════════════════════════╣");
-            info!("║ {} │ {}   │ {} │ {}              │ {}                      ║",
-                "Sym", "Volume", "Net APR",
-                "Reason", "Detail");
-            info!("╠════════════════════════════════════════════════════════════════════════════════╣");
+            let mut filtered_table = Table::new();
+            filtered_table.set_format(*format::consts::FORMAT_BOX_CHARS);
+
+            filtered_table.set_titles(Row::new(vec![
+                Cell::new("FILTERED OUT (TOP 10 BY VOLUME)").style_spec("cb").with_hspan(5)
+            ]));
+
+            filtered_table.add_row(Row::new(vec![
+                Cell::new("Sym").style_spec("b"),
+                Cell::new("Volume").style_spec("b"),
+                Cell::new("Net APR").style_spec("b"),
+                Cell::new("Reason").style_spec("b"),
+                Cell::new("Detail").style_spec("b"),
+            ]));
 
             let mut filtered: Vec<_> = self.all_candidates.iter()
                 .filter(|c| c.filter_result != FilterResult::Passed)
@@ -267,9 +304,9 @@ impl ScanResult {
 
             for candidate in filtered.iter().take(10) {
                 let opp = &candidate.opportunity;
-                let sym = format!("{:4}", truncate(&opp.symbol, 4));
-                let vol = format!("{:>8}", format_volume(opp.total_volume_24h));
-                let apr = format!("{:>6.1}%", opp.best_net_apr);
+                let sym = truncate(&opp.symbol, 4);
+                let vol = format_volume(opp.total_volume_24h);
+                let apr = format!("{:.1}%", opp.best_net_apr);
 
                 let (reason, detail) = match candidate.filter_result {
                     FilterResult::FailedVolume => {
@@ -289,12 +326,17 @@ impl ScanResult {
                     FilterResult::Passed => continue,
                 };
 
-                info!("║ {} │ {} │ {} │ {:19} │ {:<27} ║",
-                    sym, vol, apr, reason, detail);
+                filtered_table.add_row(Row::new(vec![
+                    Cell::new(&sym),
+                    Cell::new(&vol),
+                    Cell::new(&apr),
+                    Cell::new(reason).style_spec("Fr"), // Red
+                    Cell::new(&detail),
+                ]));
             }
+            filtered_table.printstd();
+            println!();
         }
-
-        info!("╚════════════════════════════════════════════════════════════════════════════════╝");
     }
 }
 

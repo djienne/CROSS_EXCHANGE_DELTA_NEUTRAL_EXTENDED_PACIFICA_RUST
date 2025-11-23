@@ -17,6 +17,7 @@
 use extended_connector::{
     FundingBot, OpportunityConfig, PacificaCredentials,
 };
+use colored::*;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -24,12 +25,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt()
         .with_target(false)
         .with_thread_ids(false)
-        .with_line_number(true)
+        .with_line_number(false)
+        .without_time() // Cleaner output for a CLI tool
         .init();
 
-    println!("╔═══════════════════════════════════════════════════════════════╗");
-    println!("║         FUNDING RATE ARBITRAGE BOT (Extended/Pacifica)       ║");
-    println!("╚═══════════════════════════════════════════════════════════════╝");
+    println!("{}", "╔═══════════════════════════════════════════════════════════════╗".bright_cyan());
+    println!("║         {}       ║", "FUNDING RATE ARBITRAGE BOT (Extended/Pacifica)".bright_yellow().bold());
+    println!("{}", "╚═══════════════════════════════════════════════════════════════╝".bright_cyan());
     println!();
 
     // Load environment variables
