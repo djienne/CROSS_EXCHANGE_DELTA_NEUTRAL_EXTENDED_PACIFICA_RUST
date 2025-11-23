@@ -17,6 +17,11 @@ Cargo.lock
 # Bot State (may contain sensitive data)
 bot_state.json
 
+# Account & credential text files
+*account*.txt
+*wallet*.txt
+*credential*.txt
+
 # Claude Code
 .claude/
 CLAUDE.md
