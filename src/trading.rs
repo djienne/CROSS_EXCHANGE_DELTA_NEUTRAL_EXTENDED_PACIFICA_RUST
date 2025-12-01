@@ -8,6 +8,11 @@ use std::time::Duration;
 use tokio::time::sleep;
 use tracing::{info, warn, error};
 
+const ORDER_MAX_ATTEMPTS: u32 = 5;
+const ORDER_BASE_BACKOFF_MS: u64 = 1_000;
+const RATE_LIMIT_BACKOFF_MS: u64 = 3_000;
+const BACKOFF_MAX_EXPONENT: u32 = 6;
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct DeltaNeutralPosition {
     pub symbol: String,
@@ -38,6 +43,20 @@ impl TradingError {
 }
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
+
+fn looks_like_rate_limit(error_msg: &str) -> bool {
+    let msg = error_msg.to_lowercase();
+    msg.contains("429") || msg.contains("too many requests") || msg.contains("rate limit")
+}
+
+fn backoff_delay_ms(attempt: u32, rate_limited: bool) -> u64 {
+    if rate_limited {
+        RATE_LIMIT_BACKOFF_MS * attempt as u64
+    } else {
+        let capped_exponent = attempt.saturating_sub(1).min(BACKOFF_MAX_EXPONENT);
+        ORDER_BASE_BACKOFF_MS * 2u64.pow(capped_exponent)
+    }
+}
 
 /// Calculate position size based on available capital and lot size constraints
 pub fn calculate_position_size(
@@ -151,16 +170,50 @@ pub async fn open_delta_neutral_position(
     let extended_side = if long_on_extended { OrderSide::Buy } else { OrderSide::Sell };
     info!("Placing Extended order: {:?} {:.6} {} @ market", extended_side, position_size_base, symbol);
 
-    let extended_order = extended_client.place_market_order(
-        extended_market_symbol,
-        extended_side,
-        notional_usd,
-        stark_private_key,
-        stark_public_key,
-        vault_id,
-        false, // reduce_only = false (opening position)
-        Some(position_size_base), // pass desired base to match targeted size
-    ).await?;
+    let mut extended_order = None;
+    for attempt in 1..=ORDER_MAX_ATTEMPTS {
+        match extended_client.place_market_order(
+            extended_market_symbol,
+            extended_side.clone(),
+            notional_usd,
+            stark_private_key,
+            stark_public_key,
+            vault_id,
+            false, // reduce_only = false (opening position)
+            Some(position_size_base), // pass desired base to match targeted size
+        ).await {
+            Ok(order) => {
+                if attempt > 1 {
+                    info!("Extended order succeeded on attempt {}/{}", attempt, ORDER_MAX_ATTEMPTS);
+                }
+                extended_order = Some(order);
+                break;
+            }
+            Err(e) => {
+                let rate_limited = looks_like_rate_limit(&e.to_string());
+                if attempt >= ORDER_MAX_ATTEMPTS {
+                    return Err(Box::new(TradingError::new(
+                        format!("Extended order failed after {} attempts: {}", ORDER_MAX_ATTEMPTS, e),
+                        rate_limited,
+                    )));
+                }
+
+                let delay_ms = backoff_delay_ms(attempt, rate_limited);
+                warn!(
+                    "Extended order failed (attempt {}/{}{}) : {}. Retrying in {}ms...",
+                    attempt,
+                    ORDER_MAX_ATTEMPTS,
+                    if rate_limited { " - rate limited" } else { "" },
+                    e,
+                    delay_ms
+                );
+                sleep(Duration::from_millis(delay_ms)).await;
+            }
+        }
+    }
+
+    let extended_order = extended_order
+        .expect("Extended order should be set or function should have returned on failure");
     info!("Extended order placed: {:?}", extended_order);
 
     // Step 2: Place second order with retry (Pacifica)
@@ -168,13 +221,13 @@ pub async fn open_delta_neutral_position(
     let slippage_percent = 0.5; // 0.5% slippage tolerance
 
     info!("Placing Pacifica order: {:?} {:.6} {} @ market (with {} retries)",
-        pacifica_side, position_size_base, symbol, 5);
+        pacifica_side, position_size_base, symbol, ORDER_MAX_ATTEMPTS);
 
     // Retry logic for Pacifica order (inline due to mutable reference)
     let mut pacifica_order = None;
     let mut pacifica_error = None;
 
-    for attempt in 1..=5 {
+    for attempt in 1..=ORDER_MAX_ATTEMPTS {
         match pacifica_client.place_market_order(
             pacifica_market_symbol,
             pacifica_side,
@@ -184,18 +237,26 @@ pub async fn open_delta_neutral_position(
         ).await {
             Ok(order) => {
                 if attempt > 1 {
-                    info!("Pacifica order succeeded on attempt {}/5", attempt);
+                    info!("Pacifica order succeeded on attempt {}/{}", attempt, ORDER_MAX_ATTEMPTS);
                 }
                 pacifica_order = Some(order);
                 break;
             }
             Err(e) => {
-                if attempt >= 5 {
-                    error!("Pacifica order failed after 5 attempts: {}", e);
+                let rate_limited = looks_like_rate_limit(&e.to_string());
+                if attempt >= ORDER_MAX_ATTEMPTS {
+                    error!("Pacifica order failed after {} attempts: {}", ORDER_MAX_ATTEMPTS, e);
                     pacifica_error = Some(e);
                 } else {
-                    let delay_ms = 2u64.pow(attempt - 1) * 1000;
-                    warn!("Pacifica order failed (attempt {}/5): {}. Retrying in {}ms...", attempt, e, delay_ms);
+                    let delay_ms = backoff_delay_ms(attempt, rate_limited);
+                    warn!(
+                        "Pacifica order failed (attempt {}/{}{}) : {}. Retrying in {}ms...",
+                        attempt,
+                        ORDER_MAX_ATTEMPTS,
+                        if rate_limited { " - rate limited" } else { "" },
+                        e,
+                        delay_ms
+                    );
                     sleep(Duration::from_millis(delay_ms)).await;
                 }
             }
@@ -214,29 +275,52 @@ pub async fn open_delta_neutral_position(
             info!("ROLLBACK: Placing Extended order: {:?} {:.6} {} @ market", close_side, position_size_base, symbol);
 
             // We use place_market_order directly for rollback to avoid needing a Position object
-            match extended_client.place_market_order(
-                extended_market_symbol,
-                close_side,
-                notional_usd, // Use same notional
-                stark_private_key,
-                stark_public_key,
-                vault_id,
-                true, // reduce_only = true
-                Some(position_size_base), // pass base size to ensure full close
-            ).await {
-                Ok(order) => {
-                    info!("ROLLBACK SUCCESSFUL: Extended position closed. Order: {:?}", order);
-                    return Err(Box::new(TradingError::new(
-                        format!("Pacifica order failed. Extended position successfully rolled back (closed). Original error: {}", err_msg),
-                        true
-                    )));
-                }
-                Err(e) => {
-                    error!("ROLLBACK FAILED: Failed to close Extended position! You may have a naked position! Error: {}", e);
-                    return Err(Box::new(TradingError::new(
-                        format!("Pacifica order failed AND rollback failed. CRITICAL: Check Extended position manually! Original error: {}. Rollback error: {}", err_msg, e),
-                        false // Not recoverable automatically, needs manual intervention
-                    )));
+            let mut attempt: u32 = 0;
+            loop {
+                attempt += 1;
+                match extended_client.place_market_order(
+                    extended_market_symbol,
+                    close_side.clone(),
+                    notional_usd, // Use same notional
+                    stark_private_key,
+                    stark_public_key,
+                    vault_id,
+                    true, // reduce_only = true
+                    Some(position_size_base), // pass base size to ensure full close
+                ).await {
+                    Ok(order) => {
+                        info!(
+                            "ROLLBACK SUCCESSFUL on attempt {}/{}: Extended position closed. Order: {:?}",
+                            attempt,
+                            ORDER_MAX_ATTEMPTS,
+                            order
+                        );
+                        return Err(Box::new(TradingError::new(
+                            format!("Pacifica order failed. Extended position successfully rolled back (closed). Original error: {}", err_msg),
+                            true
+                        )));
+                    }
+                    Err(e) => {
+                        let rate_limited = looks_like_rate_limit(&e.to_string());
+                        if !rate_limited && attempt >= ORDER_MAX_ATTEMPTS {
+                            error!("ROLLBACK FAILED after {} attempts: {}. Extended position may be open!", ORDER_MAX_ATTEMPTS, e);
+                            return Err(Box::new(TradingError::new(
+                                format!("Pacifica order failed AND rollback failed. CRITICAL: Check Extended position manually! Original error: {}. Rollback error: {}", err_msg, e),
+                                false // Not recoverable automatically, needs manual intervention
+                            )));
+                        }
+
+                        let delay_ms = backoff_delay_ms(attempt, rate_limited);
+                        warn!(
+                            "ROLLBACK Extended order failed (attempt {}{}{}) : {}. Retrying in {}ms...",
+                            attempt,
+                            if !rate_limited { format!("/{}", ORDER_MAX_ATTEMPTS) } else { String::new() },
+                            if rate_limited { " - rate limited, will keep retrying" } else { "" },
+                            e,
+                            delay_ms
+                        );
+                        sleep(Duration::from_millis(delay_ms)).await;
+                    }
                 }
             }
         }

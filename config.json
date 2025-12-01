@@ -7,7 +7,7 @@
   },
   "trading": {
     "max_position_size_usd": 800.0,
-    "hold_time_hours": 96
+    "hold_time_hours": 48
   },
   "display": {
     "max_opportunities_shown": 10,
@@ -15,7 +15,7 @@
   },
   "performance": {
     "fetch_timeout_seconds": 30,
-    "rate_limit_delay_ms": 100
+    "rate_limit_delay_ms": 250
   },
   "notes": {
     "description": "Configuration for funding rate arbitrage opportunity finder and bot",

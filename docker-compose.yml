@@ -16,14 +16,16 @@ services:
     # Environment variables from .env file
     env_file:
       - .env
+    environment:
+      - STATE_FILE_PATH=/app/state/bot_state.json
 
     # Mount volumes for configuration and data persistence
     volumes:
       # Configuration file (read-only)
       - ./config.json:/app/config.json:ro
 
-      # State file for position tracking (read-write)
-      - ./bot_state.json:/app/bot_state.json:rw
+      # State directory for position tracking (read-write)
+      - ./state:/app/state:rw
 
       # Optional: Mount .env file explicitly (if not using env_file)
       # - ./.env:/app/.env:ro

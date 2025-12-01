@@ -1,12 +1,17 @@
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use ed25519_dalek::{Signer, SigningKey};
+use reqwest::StatusCode;
 use serde::Deserialize;
 use serde_json::json;
 use std::collections::HashMap;
-use tracing::{debug, info};
+use std::time::Duration;
+use tokio::time::sleep;
+use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 const MAINNET_REST_URL: &str = "https://api.pacifica.fi";
+const MARKET_INFO_MAX_RETRIES: u32 = 5;
+const MARKET_INFO_BASE_BACKOFF_MS: u64 = 500;
 
 /// Credentials for Pacifica trading
 #[derive(Debug, Clone)]
@@ -163,31 +168,81 @@ impl PacificaTrading {
 
     /// Fetch market info for all symbols
     pub async fn get_market_info(&mut self) -> Result<&HashMap<String, PacificaMarketInfo>> {
-        if self.market_info_cache.is_some() {
-            return Ok(self.market_info_cache.as_ref().unwrap());
-        }
-
-        let url = format!("{}/api/v1/info", self.rest_url);
-        let response = self.client.get(&url).send().await?;
-
-        if !response.status().is_success() {
-            anyhow::bail!("Failed to fetch market info: {}", response.status());
-        }
-
         #[derive(Deserialize)]
         struct ApiResponse {
             data: Vec<PacificaMarketInfo>,
         }
 
-        let api_response: ApiResponse = response.json().await?;
+        if self.market_info_cache.is_none() {
+            let url = format!("{}/api/v1/info", self.rest_url);
+            let mut last_error = None;
 
-        let mut cache = HashMap::new();
-        for info in api_response.data {
-            cache.insert(info.symbol.clone(), info);
+            for attempt in 1..=MARKET_INFO_MAX_RETRIES {
+                if attempt > 1 {
+                    let backoff_ms = MARKET_INFO_BASE_BACKOFF_MS * 2u64.pow(attempt - 2);
+                    sleep(Duration::from_millis(backoff_ms)).await;
+                }
+
+                let response = match self.client.get(&url).send().await {
+                    Ok(resp) => resp,
+                    Err(e) => {
+                        let err = anyhow!("[PACIFICA] Market info request attempt {}/{} failed: {}", attempt, MARKET_INFO_MAX_RETRIES, e);
+                        warn!("{}", err);
+                        last_error = Some(err);
+                        continue;
+                    }
+                };
+
+                let status = response.status();
+                if status.is_success() {
+                    let api_response: ApiResponse = response.json().await?;
+
+                    let mut cache = HashMap::new();
+                    for info in api_response.data {
+                        cache.insert(info.symbol.clone(), info);
+                    }
+
+                    info!("[PACIFICA] Cached market info for {} symbols", cache.len());
+                    self.market_info_cache = Some(cache);
+                    break;
+                }
+
+                if status == StatusCode::TOO_MANY_REQUESTS {
+                    let retry_after_ms = response
+                        .headers()
+                        .get("retry-after")
+                        .and_then(|v| v.to_str().ok())
+                        .and_then(|s| s.parse::<u64>().ok())
+                        .map(|secs| secs * 1000);
+
+                    let delay_ms = retry_after_ms.unwrap_or_else(|| MARKET_INFO_BASE_BACKOFF_MS * 2u64.pow(attempt - 1));
+                    warn!(
+                        "[PACIFICA] Market info rate limited (429) attempt {}/{}. Waiting {}ms before retry.",
+                        attempt,
+                        MARKET_INFO_MAX_RETRIES,
+                        delay_ms
+                    );
+                    last_error = Some(anyhow!("[PACIFICA] Market info rate limited (429)"));
+                    sleep(Duration::from_millis(delay_ms)).await;
+                    continue;
+                }
+
+                let error_text = response.text().await.unwrap_or_default();
+                let err = anyhow!(
+                    "[PACIFICA] Market info request failed (attempt {}/{}): {} - {}",
+                    attempt,
+                    MARKET_INFO_MAX_RETRIES,
+                    status,
+                    error_text
+                );
+                warn!("{}", err);
+                last_error = Some(err);
+            }
+
+            if self.market_info_cache.is_none() {
+                return Err(last_error.unwrap_or_else(|| anyhow!("[PACIFICA] Market info request failed after retries")));
+            }
         }
-
-        info!("[PACIFICA] Cached market info for {} symbols", cache.len());
-        self.market_info_cache = Some(cache);
 
         Ok(self.market_info_cache.as_ref().unwrap())
     }
@@ -520,9 +575,24 @@ impl PacificaTrading {
             .send()
             .await?;
 
-        if !response.status().is_success() {
+        let status = response.status();
+        if !status.is_success() {
+            let retry_after_ms = response
+                .headers()
+                .get("retry-after")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|s| s.parse::<u64>().ok())
+                .map(|secs| secs * 1000);
+
             let error_text = response.text().await?;
-            anyhow::bail!("Order placement failed: {}", error_text);
+            if status == StatusCode::TOO_MANY_REQUESTS {
+                let retry_hint = retry_after_ms
+                    .map(|ms| format!(" (retry after {}ms)", ms))
+                    .unwrap_or_default();
+                anyhow::bail!("Order placement failed: 429 Too Many Requests{} - {}", retry_hint, error_text);
+            }
+
+            anyhow::bail!("Order placement failed: {} - {}", status, error_text);
         }
 
         let order_response: OrderResponse = response.json().await?;
@@ -632,9 +702,24 @@ impl PacificaTrading {
             .send()
             .await?;
 
-        if !response.status().is_success() {
+        let status = response.status();
+        if !status.is_success() {
+            let retry_after_ms = response
+                .headers()
+                .get("retry-after")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|s| s.parse::<u64>().ok())
+                .map(|secs| secs * 1000);
+
             let error_text = response.text().await?;
-            anyhow::bail!("Market order placement failed: {}", error_text);
+            if status == StatusCode::TOO_MANY_REQUESTS {
+                let retry_hint = retry_after_ms
+                    .map(|ms| format!(" (retry after {}ms)", ms))
+                    .unwrap_or_default();
+                anyhow::bail!("Market order placement failed: 429 Too Many Requests{} - {}", retry_hint, error_text);
+            }
+
+            anyhow::bail!("Market order placement failed: {} - {}", status, error_text);
         }
 
         let order_response: OrderResponse = response.json().await?;

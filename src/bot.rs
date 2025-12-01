@@ -7,6 +7,7 @@ use crate::{
 use crate::pacifica::types::PacificaPosition;
 use crate::pacifica::PacificaWsTrading;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 use std::time::Duration;
@@ -16,7 +17,7 @@ use tracing::{info, warn, error};
 use prettytable::{Table, Row, Cell, format};
 use colored::*;
 
-const STATE_FILE: &str = "bot_state.json";
+const DEFAULT_STATE_FILE: &str = "bot_state.json";
 const MONITORING_INTERVAL_MINUTES: u64 = 15;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -54,6 +55,11 @@ impl BotState {
 
     /// Save state to JSON file
     pub fn save_to_file(&self, path: &str) -> Result<(), Box<dyn std::error::Error>> {
+        if let Some(parent) = Path::new(path).parent() {
+            if !parent.as_os_str().is_empty() {
+                fs::create_dir_all(parent)?;
+            }
+        }
         let content = serde_json::to_string_pretty(self)?;
         fs::write(path, content)?;
         info!("Saved bot state to {}", path);
@@ -97,9 +103,14 @@ pub struct FundingBot {
     opportunity_finder: OpportunityFinder,
     config: OpportunityConfig,
     state: BotState,
+    state_path: String,
     stark_private_key: String,
     stark_public_key: String,
     vault_id: String,
+}
+
+fn resolve_state_path() -> String {
+    std::env::var("STATE_FILE_PATH").unwrap_or_else(|_| DEFAULT_STATE_FILE.to_string())
 }
 
 impl FundingBot {
@@ -119,7 +130,8 @@ impl FundingBot {
             config.clone(),
         )?;
 
-        let state = BotState::load_from_file(STATE_FILE)?;
+        let state_path = resolve_state_path();
+        let state = BotState::load_from_file(&state_path)?;
 
         Ok(Self {
             extended_client,
@@ -128,6 +140,7 @@ impl FundingBot {
             opportunity_finder,
             config,
             state,
+            state_path,
             stark_private_key,
             stark_public_key,
             vault_id,
@@ -177,7 +190,7 @@ impl FundingBot {
                 symbol
             );
             self.state.current_position = None;
-            self.state.save_to_file(STATE_FILE)?;
+            self.state.save_to_file(&self.state_path)?;
             return Ok(());
         }
 
@@ -186,7 +199,7 @@ impl FundingBot {
         updated.extended_position = live_ext;
         updated.pacifica_position = live_pac;
         self.state.current_position = Some(updated);
-        self.state.save_to_file(STATE_FILE)?;
+        self.state.save_to_file(&self.state_path)?;
         Ok(())
     }
 
@@ -282,6 +295,14 @@ impl FundingBot {
         extended_api_key: Option<String>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         info!("{}", "🔍 Scanning for best opportunity...");
+
+        // Safety net: if state is empty but exchanges report open positions, abort opening
+        if let Some(details) = self.detect_untracked_positions().await? {
+            return Err(format!(
+                "Live positions exist while bot state is empty. Aborting open to prevent duplicates. {}",
+                details
+            ).into());
+        }
 
         let scan_result = self.opportunity_finder.scan(extended_api_key.clone()).await?;
 
@@ -404,7 +425,7 @@ impl FundingBot {
                 .as_secs()
         );
         self.state.total_rotations += 1;
-        self.state.save_to_file(STATE_FILE)?;
+        self.state.save_to_file(&self.state_path)?;
 
         info!("{}", "✅ Position opened successfully!");
 
@@ -437,7 +458,7 @@ impl FundingBot {
 
             // Clear position from state
             self.state.current_position = None;
-            self.state.save_to_file(STATE_FILE)?;
+            self.state.save_to_file(&self.state_path)?;
 
             info!("{}", "✅ Position closed successfully!");
         } else {
@@ -457,6 +478,54 @@ impl FundingBot {
         } else {
             false
         }
+    }
+
+    /// Detect live positions when state is empty to prevent opening duplicates.
+    /// Returns Some(details) if any open positions are found while state.current_position is None.
+    async fn detect_untracked_positions(&self) -> Result<Option<String>, Box<dyn std::error::Error>> {
+        // If we already track a position, nothing to do
+        if self.state.current_position.is_some() {
+            return Ok(None);
+        }
+
+        let extended_positions = self.extended_client.get_positions(None).await?;
+        let pacifica_positions = self.pacifica_client.get_positions().await?;
+
+        if extended_positions.is_empty() && pacifica_positions.is_empty() {
+            return Ok(None);
+        }
+
+        let mut extended_symbols = HashSet::new();
+        for pos in &extended_positions {
+            let sym = pos.market.strip_suffix("-USD").unwrap_or(&pos.market).to_string();
+            extended_symbols.insert(sym);
+        }
+
+        let mut pacifica_symbols = HashSet::new();
+        for pos in &pacifica_positions {
+            pacifica_symbols.insert(pos.symbol.clone());
+        }
+
+        let mut ext_list: Vec<String> = extended_symbols.iter().cloned().collect();
+        ext_list.sort();
+        let mut pac_list: Vec<String> = pacifica_symbols.iter().cloned().collect();
+        pac_list.sort();
+        let mut overlap: Vec<String> = extended_symbols
+            .intersection(&pacifica_symbols)
+            .map(|s| s.to_string())
+            .collect();
+        overlap.sort();
+
+        let details = format!(
+            "extended: {} position(s) [{}]; pacifica: {} position(s) [{}]; overlap: [{}]",
+            extended_positions.len(),
+            ext_list.join(", "),
+            pacifica_positions.len(),
+            pac_list.join(", "),
+            overlap.join(", ")
+        );
+
+        Ok(Some(details))
     }
 
     /// Main bot loop
@@ -504,6 +573,24 @@ impl FundingBot {
                 } else {
                     info!("{}", "✅ Emergency close successful. State is now clean.");
                     // Continue to normal loop to potentially re-open if opportunity exists
+                }
+            }
+
+            // If state is empty but live positions exist, refuse to open to prevent duplicates
+            if self.state.current_position.is_none() {
+                match self.detect_untracked_positions().await {
+                    Ok(Some(details)) => {
+                        error!("⚠️  Live positions detected while bot state is empty. Skipping open/rotation to avoid duplicate exposure. {}", details);
+                        info!("Resolve by closing manually (or run the emergency_exit binary) or reconstruct bot_state.json, then restart.");
+                        sleep(Duration::from_secs(MONITORING_INTERVAL_MINUTES * 60)).await;
+                        continue;
+                    }
+                    Err(e) => {
+                        warn!("Could not verify live positions (skipping cycle to avoid duplicates): {}", e);
+                        sleep(Duration::from_secs(60)).await;
+                        continue;
+                    }
+                    _ => {}
                 }
             }
 
