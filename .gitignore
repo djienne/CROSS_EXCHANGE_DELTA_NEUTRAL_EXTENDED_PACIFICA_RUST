@@ -21,6 +21,7 @@ bot_state.json
 *account*.txt
 *wallet*.txt
 *credential*.txt
+push_to_remote.txt
 
 # Claude Code
 .claude/
