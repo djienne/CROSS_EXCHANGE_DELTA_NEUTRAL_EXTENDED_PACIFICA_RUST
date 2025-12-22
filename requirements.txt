@@ -17,6 +17,7 @@ python-dotenv==1.0.1
 pytest==7.4.3
 pytest-asyncio==0.23.3
 
+
 # Note: The x10 module is provided by the local python_sdk-starknet directory
 # To install the x10 SDK, run:
 #   cd python_sdk-starknet && pip install -e .

@@ -7,7 +7,7 @@
   },
   "trading": {
     "max_position_size_usd": 800.0,
-    "hold_time_hours": 48
+    "hold_time_hours": 23
   },
   "display": {
     "max_opportunities_shown": 10,

@@ -10,8 +10,9 @@ use tracing::{info, warn, error};
 
 const ORDER_MAX_ATTEMPTS: u32 = 5;
 const ORDER_BASE_BACKOFF_MS: u64 = 1_000;
-const RATE_LIMIT_BACKOFF_MS: u64 = 3_000;
+const RATE_LIMIT_BACKOFF_MS: u64 = 5_000;
 const BACKOFF_MAX_EXPONENT: u32 = 6;
+const POSITION_FETCH_MAX_ATTEMPTS: u32 = 6;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct DeltaNeutralPosition {
@@ -44,12 +45,12 @@ impl TradingError {
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
-fn looks_like_rate_limit(error_msg: &str) -> bool {
+pub(crate) fn looks_like_rate_limit(error_msg: &str) -> bool {
     let msg = error_msg.to_lowercase();
     msg.contains("429") || msg.contains("too many requests") || msg.contains("rate limit")
 }
 
-fn backoff_delay_ms(attempt: u32, rate_limited: bool) -> u64 {
+pub(crate) fn backoff_delay_ms(attempt: u32, rate_limited: bool) -> u64 {
     if rate_limited {
         RATE_LIMIT_BACKOFF_MS * attempt as u64
     } else {
@@ -114,16 +115,78 @@ where
                     return Err(e);
                 }
 
-                let delay_ms = 2u64.pow(attempt - 1) * 1000; // Exponential backoff: 1s, 2s, 4s, 8s, 16s
+                let rate_limited = looks_like_rate_limit(&e.to_string());
+                let delay_ms = backoff_delay_ms(attempt, rate_limited);
                 warn!(
-                    "{} failed (attempt {}/{}): {}. Retrying in {}ms...",
+                    "{} failed (attempt {}/{}{}): {}. Retrying in {}ms...",
                     operation_name,
                     attempt,
                     max_attempts,
+                    if rate_limited { " - rate limited" } else { "" },
                     e,
                     delay_ms
                 );
 
+                sleep(Duration::from_millis(delay_ms)).await;
+            }
+        }
+    }
+}
+
+async fn fetch_opened_positions_with_backoff(
+    extended_client: &RestClient,
+    pacifica_client: &mut PacificaTrading,
+    extended_market_symbol: &str,
+    pacifica_market_symbol: &str,
+) -> Result<(Option<Position>, Option<PacificaPosition>)> {
+    let mut attempt = 0;
+
+    loop {
+        attempt += 1;
+
+        let extended_positions = extended_client.get_positions(None).await;
+        let pacifica_positions = pacifica_client.get_positions().await;
+
+        match (extended_positions, pacifica_positions) {
+            (Ok(ext), Ok(pac)) => {
+                let extended_position = ext.into_iter().find(|p| p.market == extended_market_symbol);
+                let pacifica_position = pac.into_iter().find(|p| p.symbol == pacifica_market_symbol);
+                return Ok((extended_position, pacifica_position));
+            }
+            (ext_res, pac_res) => {
+                let mut parts = Vec::new();
+                if let Err(e) = &ext_res {
+                    parts.push(format!("Extended: {}", e));
+                }
+                if let Err(e) = &pac_res {
+                    parts.push(format!("Pacifica: {}", e));
+                }
+                let err_msg = if parts.is_empty() {
+                    "Unknown error".to_string()
+                } else {
+                    parts.join(" | ")
+                };
+
+                if attempt >= POSITION_FETCH_MAX_ATTEMPTS {
+                    return Err(Box::new(TradingError::new(
+                        format!(
+                            "Failed to fetch positions after {} attempts: {}",
+                            POSITION_FETCH_MAX_ATTEMPTS, err_msg
+                        ),
+                        looks_like_rate_limit(&err_msg),
+                    )));
+                }
+
+                let rate_limited = looks_like_rate_limit(&err_msg);
+                let delay_ms = backoff_delay_ms(attempt, rate_limited);
+                warn!(
+                    "Failed to fetch positions (attempt {}/{}{}): {}. Retrying in {}ms...",
+                    attempt,
+                    POSITION_FETCH_MAX_ATTEMPTS,
+                    if rate_limited { " - rate limited" } else { "" },
+                    err_msg,
+                    delay_ms
+                );
                 sleep(Duration::from_millis(delay_ms)).await;
             }
         }
@@ -329,15 +392,18 @@ pub async fn open_delta_neutral_position(
     info!("Pacifica order placed: {:?}", pacifica_order);
 
     // Step 3: Fetch opened positions
-    let extended_positions = extended_client.get_positions(None).await?;
-    let extended_position = extended_positions.iter()
-        .find(|p| p.market == extended_market_symbol)
-        .cloned();
-
-    let pacifica_positions = pacifica_client.get_positions().await?;
-    let pacifica_position = pacifica_positions.iter()
-        .find(|p| p.symbol == pacifica_market_symbol)
-        .cloned();
+    let (extended_position, pacifica_position) = match fetch_opened_positions_with_backoff(
+        extended_client,
+        pacifica_client,
+        extended_market_symbol,
+        pacifica_market_symbol,
+    ).await {
+        Ok((ext, pac)) => (ext, pac),
+        Err(e) => {
+            warn!("Failed to fetch positions after opening orders: {}. Saving state with unknown legs.", e);
+            (None, None)
+        }
+    };
 
     let opened_at = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)?

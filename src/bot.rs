@@ -1,7 +1,10 @@
 /// Funding rate arbitrage bot orchestration and state management
 use crate::{
-    OpportunityFinder, RestClient, PacificaTrading, PacificaCredentials,
-    trading::{open_delta_neutral_position, close_delta_neutral_position, calculate_position_size, DeltaNeutralPosition},
+    OpportunityFinder, RestClient, PacificaTrading, PacificaCredentials, Position,
+    trading::{
+        backoff_delay_ms, calculate_position_size, close_delta_neutral_position,
+        looks_like_rate_limit, open_delta_neutral_position, DeltaNeutralPosition,
+    },
     OpportunityConfig,
 };
 use crate::pacifica::types::PacificaPosition;
@@ -19,6 +22,7 @@ use colored::*;
 
 const DEFAULT_STATE_FILE: &str = "bot_state.json";
 const MONITORING_INTERVAL_MINUTES: u64 = 15;
+const LIVE_POSITIONS_MAX_ATTEMPTS: u32 = 6;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BotState {
@@ -40,16 +44,40 @@ impl BotState {
     pub fn load_from_file(path: &str) -> Result<Self, Box<dyn std::error::Error>> {
         if Path::new(path).exists() {
             let content = fs::read_to_string(path)?;
-            let state: BotState = serde_json::from_str(&content)?;
-            info!("Loaded bot state from {}: {} rotations, position: {}",
-                path,
-                state.total_rotations,
-                if state.current_position.is_some() { "active" } else { "none" }
-            );
-            Ok(state)
+            match serde_json::from_str::<BotState>(&content) {
+                Ok(state) => {
+                    info!("Loaded bot state from {}: {} rotations, position: {}",
+                        path,
+                        state.total_rotations,
+                        if state.current_position.is_some() { "active" } else { "none" }
+                    );
+                    Ok(state)
+                }
+                Err(e) => {
+                    warn!("Failed to parse state file {}: {}. Trying backup.", path, e);
+                    let backup_path = format!("{}.bak", path);
+                    if Path::new(&backup_path).exists() {
+                        let backup_content = fs::read_to_string(&backup_path)?;
+                        let backup_state: BotState = serde_json::from_str(&backup_content)?;
+                        info!("Loaded bot state from backup {}", backup_path);
+                        Ok(backup_state)
+                    } else {
+                        warn!("No valid backup found. Starting fresh.");
+                        let state = Self::new();
+                        if let Err(write_err) = state.save_to_file(path) {
+                            warn!("Failed to write initial state file {}: {}", path, write_err);
+                        }
+                        Ok(state)
+                    }
+                }
+            }
         } else {
             info!("No existing state file found, starting fresh");
-            Ok(Self::new())
+            let state = Self::new();
+            if let Err(e) = state.save_to_file(path) {
+                warn!("Failed to write initial state file {}: {}", path, e);
+            }
+            Ok(state)
         }
     }
 
@@ -60,8 +88,20 @@ impl BotState {
                 fs::create_dir_all(parent)?;
             }
         }
+        if Path::new(path).exists() {
+            let backup_path = format!("{}.bak", path);
+            if let Err(e) = fs::copy(path, &backup_path) {
+                warn!("Failed to write backup state file {}: {}", backup_path, e);
+            }
+        }
         let content = serde_json::to_string_pretty(self)?;
-        fs::write(path, content)?;
+        let temp_path = format!("{}.tmp", path);
+        fs::write(&temp_path, &content)?;
+        if let Err(e) = fs::rename(&temp_path, path) {
+            warn!("Atomic state file replace failed: {}. Falling back to direct write.", e);
+            fs::write(path, content)?;
+            let _ = fs::remove_file(&temp_path);
+        }
         info!("Saved bot state to {}", path);
         Ok(())
     }
@@ -94,6 +134,12 @@ impl BotState {
             None
         }
     }
+}
+
+enum RecoveryOutcome {
+    NoAction,
+    Recovered,
+    Blocked(String),
 }
 
 pub struct FundingBot {
@@ -145,6 +191,159 @@ impl FundingBot {
             stark_public_key,
             vault_id,
         })
+    }
+
+    async fn fetch_live_positions_with_backoff(
+        &self,
+    ) -> Result<(Vec<Position>, Vec<PacificaPosition>), Box<dyn std::error::Error>> {
+        let mut attempt = 0;
+
+        loop {
+            attempt += 1;
+
+            let extended_positions = self.extended_client.get_positions(None).await;
+            let pacifica_positions = self.pacifica_client.get_positions().await;
+
+            match (extended_positions, pacifica_positions) {
+                (Ok(ext), Ok(pac)) => return Ok((ext, pac)),
+                (ext_res, pac_res) => {
+                    let mut parts = Vec::new();
+                    if let Err(e) = &ext_res {
+                        parts.push(format!("Extended: {}", e));
+                    }
+                    if let Err(e) = &pac_res {
+                        parts.push(format!("Pacifica: {}", e));
+                    }
+                    let err_msg = if parts.is_empty() {
+                        "Unknown error".to_string()
+                    } else {
+                        parts.join(" | ")
+                    };
+
+                    if attempt >= LIVE_POSITIONS_MAX_ATTEMPTS {
+                        return Err(Box::new(std::io::Error::new(
+                            std::io::ErrorKind::Other,
+                            err_msg,
+                        )));
+                    }
+
+                    let rate_limited = looks_like_rate_limit(&err_msg);
+                    let delay_ms = backoff_delay_ms(attempt, rate_limited);
+                    warn!(
+                        "Failed to fetch live positions (attempt {}/{}{}): {}. Retrying in {}ms...",
+                        attempt,
+                        LIVE_POSITIONS_MAX_ATTEMPTS,
+                        if rate_limited { " - rate limited" } else { "" },
+                        err_msg,
+                        delay_ms
+                    );
+                    sleep(Duration::from_millis(delay_ms)).await;
+                }
+            }
+        }
+    }
+
+    async fn recover_state_if_untracked(
+        &mut self,
+    ) -> Result<RecoveryOutcome, Box<dyn std::error::Error>> {
+        if self.state.current_position.is_some() {
+            return Ok(RecoveryOutcome::NoAction);
+        }
+
+        let (extended_positions, pacifica_positions) = self.fetch_live_positions_with_backoff().await?;
+
+        if extended_positions.is_empty() && pacifica_positions.is_empty() {
+            return Ok(RecoveryOutcome::NoAction);
+        }
+
+        let mut extended_symbols = HashSet::new();
+        for pos in &extended_positions {
+            let sym = pos.market.strip_suffix("-USD").unwrap_or(&pos.market).to_string();
+            extended_symbols.insert(sym);
+        }
+
+        let mut pacifica_symbols = HashSet::new();
+        for pos in &pacifica_positions {
+            pacifica_symbols.insert(pos.symbol.clone());
+        }
+
+        let mut ext_list: Vec<String> = extended_symbols.iter().cloned().collect();
+        ext_list.sort();
+        let mut pac_list: Vec<String> = pacifica_symbols.iter().cloned().collect();
+        pac_list.sort();
+        let mut overlap: Vec<String> = extended_symbols
+            .intersection(&pacifica_symbols)
+            .cloned()
+            .collect();
+        overlap.sort();
+
+        let details = format!(
+            "extended: {} position(s) [{}]; pacifica: {} position(s) [{}]; overlap: [{}]",
+            extended_positions.len(),
+            ext_list.join(", "),
+            pacifica_positions.len(),
+            pac_list.join(", "),
+            overlap.join(", ")
+        );
+
+        let mut all_symbols: Vec<String> = extended_symbols.union(&pacifica_symbols).cloned().collect();
+        all_symbols.sort();
+
+        let symbol = if overlap.len() == 1 {
+            overlap[0].clone()
+        } else if overlap.is_empty() && all_symbols.len() == 1 {
+            all_symbols[0].clone()
+        } else {
+            return Ok(RecoveryOutcome::Blocked(details));
+        };
+
+        let extended_position = extended_positions
+            .into_iter()
+            .find(|p| p.market.strip_suffix("-USD").unwrap_or(&p.market) == symbol);
+        let pacifica_position = pacifica_positions
+            .into_iter()
+            .find(|p| p.symbol == symbol);
+
+        let opened_at = pacifica_position
+            .as_ref()
+            .and_then(|pos| if pos.created_at > 0 { Some((pos.created_at / 1000) as u64) } else { None })
+            .unwrap_or_else(|| {
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs()
+            });
+
+        let mut target_notional_usd: f64 = 0.0;
+        if let Some(ref ext_pos) = extended_position {
+            let value = ext_pos.value_f64();
+            if value > 0.0 {
+                target_notional_usd = target_notional_usd.max(value);
+            }
+        }
+        if let Some(ref pac_pos) = pacifica_position {
+            let value = pac_pos.size() * pac_pos.entry();
+            if value > 0.0 {
+                target_notional_usd = target_notional_usd.max(value);
+            }
+        }
+
+        let position = DeltaNeutralPosition {
+            symbol,
+            extended_position,
+            pacifica_position,
+            opened_at,
+            target_notional_usd,
+        };
+
+        self.state.current_position = Some(position);
+        if self.state.last_rotation_time.is_none() {
+            self.state.last_rotation_time = Some(opened_at);
+        }
+        self.state.save_to_file(&self.state_path)?;
+        info!("Recovered bot state from live positions. {}", details);
+
+        Ok(RecoveryOutcome::Recovered)
     }
 
     /// Reconcile saved state with live exchange positions.
@@ -297,11 +496,18 @@ impl FundingBot {
         info!("{}", "🔍 Scanning for best opportunity...");
 
         // Safety net: if state is empty but exchanges report open positions, abort opening
-        if let Some(details) = self.detect_untracked_positions().await? {
-            return Err(format!(
-                "Live positions exist while bot state is empty. Aborting open to prevent duplicates. {}",
-                details
-            ).into());
+        match self.recover_state_if_untracked().await? {
+            RecoveryOutcome::Recovered => {
+                warn!("Recovered bot state from live positions; skipping new open.");
+                return Ok(());
+            }
+            RecoveryOutcome::Blocked(details) => {
+                return Err(format!(
+                    "Live positions exist while bot state is empty. Aborting open to prevent duplicates. {}",
+                    details
+                ).into());
+            }
+            RecoveryOutcome::NoAction => {}
         }
 
         let scan_result = self.opportunity_finder.scan(extended_api_key.clone()).await?;
@@ -480,54 +686,6 @@ impl FundingBot {
         }
     }
 
-    /// Detect live positions when state is empty to prevent opening duplicates.
-    /// Returns Some(details) if any open positions are found while state.current_position is None.
-    async fn detect_untracked_positions(&self) -> Result<Option<String>, Box<dyn std::error::Error>> {
-        // If we already track a position, nothing to do
-        if self.state.current_position.is_some() {
-            return Ok(None);
-        }
-
-        let extended_positions = self.extended_client.get_positions(None).await?;
-        let pacifica_positions = self.pacifica_client.get_positions().await?;
-
-        if extended_positions.is_empty() && pacifica_positions.is_empty() {
-            return Ok(None);
-        }
-
-        let mut extended_symbols = HashSet::new();
-        for pos in &extended_positions {
-            let sym = pos.market.strip_suffix("-USD").unwrap_or(&pos.market).to_string();
-            extended_symbols.insert(sym);
-        }
-
-        let mut pacifica_symbols = HashSet::new();
-        for pos in &pacifica_positions {
-            pacifica_symbols.insert(pos.symbol.clone());
-        }
-
-        let mut ext_list: Vec<String> = extended_symbols.iter().cloned().collect();
-        ext_list.sort();
-        let mut pac_list: Vec<String> = pacifica_symbols.iter().cloned().collect();
-        pac_list.sort();
-        let mut overlap: Vec<String> = extended_symbols
-            .intersection(&pacifica_symbols)
-            .map(|s| s.to_string())
-            .collect();
-        overlap.sort();
-
-        let details = format!(
-            "extended: {} position(s) [{}]; pacifica: {} position(s) [{}]; overlap: [{}]",
-            extended_positions.len(),
-            ext_list.join(", "),
-            pacifica_positions.len(),
-            pac_list.join(", "),
-            overlap.join(", ")
-        );
-
-        Ok(Some(details))
-    }
-
     /// Main bot loop
     pub async fn run(&mut self, extended_api_key: Option<String>) -> Result<(), Box<dyn std::error::Error>> {
         info!("{}", "🚀 Starting Funding Rate Arbitrage Bot");
@@ -578,8 +736,11 @@ impl FundingBot {
 
             // If state is empty but live positions exist, refuse to open to prevent duplicates
             if self.state.current_position.is_none() {
-                match self.detect_untracked_positions().await {
-                    Ok(Some(details)) => {
+                match self.recover_state_if_untracked().await {
+                    Ok(RecoveryOutcome::Recovered) => {
+                        info!("Recovered bot state from live positions. Monitoring only.");
+                    }
+                    Ok(RecoveryOutcome::Blocked(details)) => {
                         error!("⚠️  Live positions detected while bot state is empty. Skipping open/rotation to avoid duplicate exposure. {}", details);
                         info!("Resolve by closing manually (or run the emergency_exit binary) or reconstruct bot_state.json, then restart.");
                         sleep(Duration::from_secs(MONITORING_INTERVAL_MINUTES * 60)).await;
@@ -590,7 +751,7 @@ impl FundingBot {
                         sleep(Duration::from_secs(60)).await;
                         continue;
                     }
-                    _ => {}
+                    Ok(RecoveryOutcome::NoAction) => {}
                 }
             }
 
